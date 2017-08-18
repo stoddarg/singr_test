@@ -37,6 +37,7 @@
 /* Globals */
 #define UART_DEVICEID      XPAR_XUARTPS_0_DEVICE_ID
 #define SW_BREAK_GPIO		51
+#define SIZEOF_DATA_ARRAY	12288
 
 // Hardware Interface
 XUartPs Uart_PS;					// Instance of the UART Device

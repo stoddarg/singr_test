@@ -97,19 +97,6 @@ int main()
 
 	//******************Setup Ethernet Connection*****************//
 #if defined (__arm__) || defined(__aarch64__)
-#include "xil_printf.h"
-#endif
-
-#if LWIP_DHCP==1
-#include "lwip/dhcp.h"
-#endif
-
-#if LWIP_DHCP==1
-extern volatile int dhcp_timoutcntr;
-err_t dhcp_start(struct netif *netif);
-#endif
-
-#if defined (__arm__) || defined(__aarch64__)
 #if XPAR_GIGE_PCS_PMA_SGMII_CORE_PRESENT == 1 || XPAR_GIGE_PCS_PMA_1000BASEX_CORE_PRESENT == 1
 int ProgramSi5324(void);
 int ProgramSfpPhy(void);
@@ -214,7 +201,7 @@ echo_netif = &server_netif;
 	//****************** Mount SD Card *****************//
 
 	//****************** Write to SD Card *****************//
-	int iterator = 0;
+/*	int iterator = 0;
 	unsigned int numBytesWritten = 0;
 	unsigned int numBytesRead = 0;
 	unsigned char myData256[256] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -257,11 +244,25 @@ echo_netif = &server_netif;
 
 		++iterator;
 		sleep(1);
-	}
+	} */
 	//****************** Write to SD Card *****************//
 
-	xil_printf("Res: %d\r\n",Res);
+//	xil_printf("Res: %d\r\n",Res);
 
+	//Testing for dynamic allocation of arrays
+//	int * testarray = NULL;							//Update the linker script in Echo3/src to adjust the size of the heap; if it's too small, then we can't allocate this
+//	testarray = (int *)calloc(10000, sizeof(int));	//10 000 * sizeof(int) is too large to allocate dynamically
+//	if(testarray == NULL)
+//		xil_printf("Could not allocate array\r\n");
+//
+//	testarray[10] = 11;
+//	testarray[55] = 56;
+//	testarray[567] = 88;
+//
+//	xil_printf("%d_%d_%d_%d_%d\r\n",testarray[1],testarray[10],testarray[55],testarray[99],testarray[567]);
+//
+//	free(testarray);
+//	testarray = NULL;
 
 	// *********** Setup the Hardware Reset GPIO ****************//
 	GPIOConfigPtr = XGpioPs_LookupConfig(XPAR_PS7_GPIO_0_DEVICE_ID);
@@ -271,7 +272,7 @@ echo_netif = &server_netif;
 	// *********** Setup the Hardware Reset MIO ****************//
 
 	// ******************* POLLING LOOP *******************//
-	xil_printf("\n\r Turn on Local Echo: under Terminal-Setup in Tera Term \n\r");
+	//xil_printf("\n\r Turn on Local Echo: under Terminal-Setup in Tera Term \n\r");
 	Xil_Out32(XPAR_AXI_GPIO_18_BASEADDR, 1);
 	while(1){
 		sw = 0;   //  stop switch reset to 0
@@ -279,7 +280,7 @@ echo_netif = &server_netif;
 		for (i=0; i<32; i++ ) { RecvBuffer[i] = '_'; }			// Clear RecvBuffer Variable
 
 		sleep(0.5);  // Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 0.5 s
-		xil_printf("\n\r v2.03a \n\r");
+		xil_printf("\n\r v2.1 \n\r");
 		xil_printf("\n\r MAIN MENU \n\r");
 		xil_printf("******************************\n\r");
 		xil_printf(" 0) Set Mode of Operation\n\r");
@@ -352,8 +353,6 @@ echo_netif = &server_netif;
 		case 2: //Continuously Read of Processed Data
 			xil_printf("\n\r ********Data Acquisition:\n\r");
 			xil_printf(" Press 'q' to Stop or Press Hardware USR reset button  \n\r");
-			xil_printf(" Press <return> to Start");
-			ReadCommandPoll();
 			DAQ();
 			sw = 0;   // broke out of the read loop, stop swith reset to 0
 			break;
@@ -658,28 +657,33 @@ void SetIntegrationTimes(u8 wfid){
 
 //////////////////////////// PrintData ////////////////////////////////
 int PrintData( ){
-	u32 data;
-	int dram_addr;
-
-	//Read all data from DRAM
-//	int dram_base = 0xa000000;
-    int dram_cieling = 0xa00ffff; //read out data from all integration channels	//167837695
-
-	// Read only Adj Average data from DRAM	//167772160
+	int index = 0;
+	int dram_addr = 0;
 	int dram_base = 0xa000000;
-	//int dram_cieling = 0xA004000; //read out just adjacent average (0xA004000 - 0xa000000 = 16384)
+	int dram_ceiling = 0xa00c000;
+	unsigned int * data_array = NULL;
+	data_array = calloc(SIZEOF_DATA_ARRAY, sizeof(unsigned int));	//dynamically allocate buffer to save on stack space
+	if(data_array == NULL)											//check we have allocated the buffer
+		return 1;
+//	FRESULT ffres;
+//	uint numBytesWritten = 0;
+//	FIL datafile;
+//	int filesize = 0;
 
-	Xil_DCacheInvalidateRange(0x00000000, 65536);
+	Xil_DCacheInvalidateRange(0x00000000, 65536);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer
 
-	for (dram_addr = dram_base; dram_addr <= dram_cieling; dram_addr+=4){
-		if (!sw) { sw = XGpioPs_ReadPin(&Gpio, SW_BREAK_GPIO); } //read pin
-		data = Xil_In32(dram_addr);
-		xil_printf("%d\r\n",data);
-		XUartPs_Recv(&Uart_PS, &RecvBuffer, 32);
-		if ( RecvBuffer[0] == 'q' ) { sw = 1;  }
-		if(sw) { return sw; }
+	for (dram_addr = dram_base; dram_addr <= dram_ceiling; dram_addr+=4, index++){	//read over the addresses and save into an array to save to SD
+		data_array[index] = Xil_In32(dram_addr);
 	}
 
+	//Save to SD card here
+//	ffres = f_open(&datafile, "datatest.txt", FA_OPEN_ALWAYS | FA_WRITE);
+//	ffres = f_lseek(&datafile, file_size(&datafile));
+//	ffres = f_write(&datafile, data_array, filesize, &numBytesWritten);
+//	ffres = f_close(&datafile);
+
+	free(data_array);
+	data_array = NULL;
 	return sw;
 }
 //////////////////////////// PrintData ////////////////////////////////
@@ -688,47 +692,43 @@ int PrintData( ){
 //////////////////////////// Clear Processed Data Buffers ////////////////////////////////
 void ClearBuffers() {
 	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,1);
-	sleep(1);						// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
+	usleep(1);						// Built in Latency - 1 us // 1 clock cycle-ish
 	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
 }
 //////////////////////////// Clear Processed Data Buffers ////////////////////////////////
 
 //////////////////////////// DAQ ////////////////////////////////
 int DAQ(){
-	int buffsize; 	//BRAM buffer size
-	int readdeapth; //current read address
+//	int buffsize; 	//BRAM buffer size
+//	int readdeapth; //current read address
 	//int dram_addr;	// DRAM Address
 
-	XUartPs_SetOptions(&Uart_PS,XUARTPS_OPTION_RESET_RX);
-
-	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000); 		// DMA Transfer Step 1
-	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);			// DMA Transfer Step 2
-	sleep(1);						// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
-	ClearBuffers();												// Clear Buffers.
+//	XUartPs_SetOptions(&Uart_PS,XUARTPS_OPTION_RESET_RX);
+//
+//	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000); 		// DMA Transfer Step 1
+//	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);			// DMA Transfer Step 2
+//	sleep(1);						// Built in Latency - 1 s
+//	ClearBuffers();												// Clear Buffers.
 	// Capture garbage in DRAM
 	//for (dram_addr = 0xa000000; dram_addr <= 0xA004000; dram_addr+=4){Xil_In32(dram_addr);}
+	xil_printf("\r\nDAQ is looping\r\n");
+	//while(1){
+		//buffsize = Xil_In32 (XPAR_AXI_GPIO_11_BASEADDR);
+		//readdeapth = Xil_In32 (XPAR_AXI_GPIO_19_BASEADDR);
+		//we were checking the following condition to determine if the buffers were full and ready to be read out:
+		//abs(Xil_In32 (XPAR_AXI_GPIO_11_BASEADDR) - Xil_In32 (XPAR_AXI_GPIO_19_BASEADDR)) >= 4095
 
-	while(1){
-		buffsize = Xil_In32 (XPAR_AXI_GPIO_11_BASEADDR);
-		readdeapth = Xil_In32 (XPAR_AXI_GPIO_19_BASEADDR);
-		if (!sw) { sw = XGpioPs_ReadPin(&Gpio, SW_BREAK_GPIO); } //read pin
-		XUartPs_Recv(&Uart_PS, &RecvBuffer, 32);
-		if ( RecvBuffer[0] == 'q' ) { sw = 1; }
-		if(sw) { return sw;	}
-
-		if(abs(buffsize - readdeapth) >= 4095){//check for at least one full buffer
-			//Xil_Out32 (XPAR_AXI_GPIO_18_BASEADDR, 0); // Disable Capture Module in FPGA
-			Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);
-			//sleep(10);  // Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 10 s
-			Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);
-			Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);
-			sleep(1); 			// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
-			Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);
-			//Xil_Out32(XPAR_AXI_GPIO_18_BASEADDR, 1);
-			ClearBuffers();
-			PrintData();
-		}
-	}
+//		if(1)
+//		{
+		Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);
+		Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);
+		Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);
+		usleep(54); 			// Built in Latency - 54 us
+		Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);
+		ClearBuffers();
+		PrintData();
+//		}
+//	}
 
 	return sw;
 }
@@ -742,8 +742,7 @@ int ether(){
 	}
 	XGpioPs_SetDirectionPin(&Gpio, etherStop, 1);
 	int sw;
-	xil_printf("begin");
-	xil_printf("\r\n");
+
 	//	a = pbuf_free_ooseq_queued;
 	g_txcomplete = 1;
 	while (g_txcomplete == 1) {
@@ -763,7 +762,9 @@ int ether(){
 			TcpSlowTmrFlag = 0;
 		}
 		xemacif_input(echo_netif);
-		transfer_data();
+		//transfer_data();	//Put printData here so that we send data each time
+		//usleep(500000);
+		DAQ();
 	}
 
 	/* Never reached */

@@ -93,7 +93,7 @@ static FIL fil5;
 static FIL fil6;
 static FATFS fatfs;
 static FILINFO fno;
-static char FileName[32] = "test22.bin";
+static char FileName[32] = "test002.bin";
 //static char FileName2[32] = "ft.txt";
 static char *SD_File;
 u32 Platform;
@@ -132,8 +132,8 @@ int main(void)
 	int Status;
 	XTime tStart, tEnd;
 
-	XTime_GetTime(&tStart);
 	xil_printf("SD Polled File System Example Test \r\n");
+	XTime_GetTime(&tStart);
 
 	Status = FfsSdPolledExample();
 	if (Status != XST_SUCCESS) {
@@ -141,8 +141,8 @@ int main(void)
 		return XST_FAILURE;
 	}
 
-	xil_printf("Successfully ran SD Polled File System Example Test \r\n");
 	XTime_GetTime(&tEnd);
+	xil_printf("Successfully ran SD Polled File System Example Test \r\n");
 
 	xil_printf("Output took %llu clock cycles\r\n", 2*(tEnd - tStart));
 	xil_printf("To get time, in us, divide by %llu / 1000000", COUNTS_PER_SECOND);
@@ -173,7 +173,7 @@ int FfsSdPolledExample(void)
 	UINT NumBytesRead;
 	UINT NumBytesWritten;
 	u32 BuffCnt;
-	u32 FileSize = (8*1024);
+	u32 FileSize = (8*1024*1024);
 	//TCHAR *Path = "0:/";
 
 	Platform = XGetPlatform_Info();
@@ -187,13 +187,13 @@ int FfsSdPolledExample(void)
 
 	for(BuffCnt = 0; BuffCnt < FileSize; BuffCnt++){
 		SourceAddress[BuffCnt] = TEST + BuffCnt;
-		if(BuffCnt < 512)
-			myData512[BuffCnt] = TEST + BuffCnt;
+//		if(BuffCnt < 512)
+//			myData512[BuffCnt] = TEST + BuffCnt;
 	}
-	for(it = 0; it < 12288; it++)
-	{
-		myArray2[it] = TEST + it;
-	}
+//	for(it = 0; it < 12288; it++)
+//	{
+//		myArray2[it] = TEST + it;
+//	}
 /*	for(it = 0; it < 512; it++)	//this works to set the values for ints to increasing values
 	{
 		if(it < 256)
@@ -312,37 +312,37 @@ int FfsSdPolledExample(void)
 
 	//Write progressively larger buffers until one of them writes properly
 	//256 bytes
-	Res = f_open(&fil5, "test512.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-	if (Res) {return XST_FAILURE;}
-
-	Res = f_write(&fil5, (const void *)myData512, 512, &NumBytesWritten);
-	if (Res) {return XST_FAILURE;}
-
-	Res = f_close(&fil5);
-	if (Res) {return XST_FAILURE;}
-
-	int index = 0;
-/*	unsigned int * myArray;
-	myArray = (unsigned int *)calloc(SIZEOF_DATA_ARRAY, sizeof(unsigned int));
-
-	for(index = 0; index < SIZEOF_DATA_ARRAY; index++)
-	{
-		if((index % 2) == 0)
-			myArray[index] = 3;
-		else
-			myArray[index] = 4;
-	} */
-
-	Res = f_open(&fil6, "lrgtest2.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);	//removed the (const void *)
-	Res = f_lseek(&fil6, SIZEOF_DATA_ARRAY);
-	Res = f_lseek(&fil6, 0);
-
-//	for(index = 0; index < 24; index++)	//write 24 512 byte blocks
+//	Res = f_open(&fil5, "test512.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+//	if (Res) {return XST_FAILURE;}
+//
+//	Res = f_write(&fil5, (const void *)myData512, 512, &NumBytesWritten);
+//	if (Res) {return XST_FAILURE;}
+//
+//	Res = f_close(&fil5);
+//	if (Res) {return XST_FAILURE;}
+//
+//	int index = 0;
+///*	unsigned int * myArray;
+//	myArray = (unsigned int *)calloc(SIZEOF_DATA_ARRAY, sizeof(unsigned int));
+//
+//	for(index = 0; index < SIZEOF_DATA_ARRAY; index++)
 //	{
-		Res = f_write(&fil6, (const void *)myArray2, SIZEOF_DATA_ARRAY, &NumBytesWritten);
-//		Res = f_sync(&fil6);
-//	}
-	Res = f_close(&fil6);
+//		if((index % 2) == 0)
+//			myArray[index] = 3;
+//		else
+//			myArray[index] = 4;
+//	} */
+//
+//	Res = f_open(&fil6, "lrgtest2.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);	//removed the (const void *)
+//	Res = f_lseek(&fil6, SIZEOF_DATA_ARRAY);
+//	Res = f_lseek(&fil6, 0);
+//
+////	for(index = 0; index < 24; index++)	//write 24 512 byte blocks
+////	{
+//		Res = f_write(&fil6, (const void *)myArray2, SIZEOF_DATA_ARRAY, &NumBytesWritten);
+////		Res = f_sync(&fil6);
+////	}
+//	Res = f_close(&fil6);
 
 	//free(myArray);
 	//myArray = NULL;

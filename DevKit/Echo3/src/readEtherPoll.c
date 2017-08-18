@@ -26,26 +26,26 @@ int readEtherPoll()
 			TcpSlowTmrFlag = 0;
 		}
 		xemacif_input(echo_netif);
-		returnval = transfer_data();
+		//returnval = transfer_data();
 
-		switch(returnval)
-		{
-		case 0:
-			xil_printf("y\r\n");
-			break;
-		case 1:
-			xil_printf("badfileopen\r\n");
-			break;
-		case 2:
-			xil_printf("numbytesmismatch\r\n");
-			break;
-		case 3:
-			xil_printf("indexmismatch\r\n");
-			break;
-		default:
-			xil_printf("???\r\n");
-			break;
-		}
+//		switch(returnval)
+//		{
+//		case 0:
+//			xil_printf("y\r\n");
+//			break;
+//		case 1:
+//			xil_printf("badfileopen\r\n");
+//			break;
+//		case 2:
+//			xil_printf("numbytesmismatch\r\n");
+//			break;
+//		case 3:
+//			xil_printf("indexmismatch\r\n");
+//			break;
+//		default:
+//			xil_printf("???\r\n");
+//			break;
+//		}
 		if(g_menuSel < 10000 && g_menuSel >= -200)	//if we don't have the correct size menu select variable, keep waiting for input? //increased range on both sides of 0
 		{											//essentially, if the global is set, we have received something
 			break;
