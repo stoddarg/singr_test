@@ -89,19 +89,17 @@ int FfsSdPolledExample(void);
 
 /************************** Variable Definitions *****************************/
 static FIL fil;		/* File object */
-static FIL fil5;
-static FIL fil6;
+FIL fil2;
+//static FIL fil5;
+//static FIL fil6;
 static FATFS fatfs;
-static FILINFO fno;
-static char FileName[32] = "test002.bin";
+//static FILINFO fno;
+static char FileName[32] = "test007.bin";
 //static char FileName2[32] = "ft.txt";
 static char *SD_File;
 u32 Platform;
-
-int myData512[512] = {};
-unsigned char myData256[256] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-//unsigned char myData512[512] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-unsigned int myArray2[SIZEOF_DATA_ARRAY] __attribute__ ((aligned(32)));
+static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
+static u8 testpieces[8192] = {};//__attribute__ ((aligned(32)));
 
 #ifdef __ICCARM__
 #pragma data_alignment = 32
@@ -109,8 +107,8 @@ unsigned int DestinationAddress[10*1024];
 unsigned int SourceAddress[10*1024];
 #pragma data_alignment = 4
 #else
-u8 DestinationAddress[10*1024*1024] __attribute__ ((aligned(32)));
-u8 SourceAddress[10*1024*1024] __attribute__ ((aligned(32)));
+u8 DestinationAddress[10*1024] __attribute__ ((aligned(32)));
+u8 SourceAddress[10*1024] __attribute__ ((aligned(32)));
 #endif
 
 #define TEST 7
@@ -168,13 +166,14 @@ int main(void)
 ******************************************************************************/
 int FfsSdPolledExample(void)
 {
-	int it = 0;
 	FRESULT Res;
 	UINT NumBytesRead;
 	UINT NumBytesWritten;
 	u32 BuffCnt;
-	u32 FileSize = (8*1024*1024);
-	//TCHAR *Path = "0:/";
+	u32 FileSize = (8*1024);
+	TCHAR *Path = "0:/";
+	int whatishere = 0;
+	int whatishere2 = 0;
 
 	Platform = XGetPlatform_Info();
 	if (Platform == XPLAT_ZYNQ_ULTRA_MP) {
@@ -182,34 +181,79 @@ int FfsSdPolledExample(void)
 		 * Since 8MB in Emulation Platform taking long time, reduced
 		 * file size to 8KB.
 		 */
-		FileSize = 8*1024;
+		FileSize = 8*1024;	//need the file size to be the equal to the number of ints we have
 	}
 
-	for(BuffCnt = 0; BuffCnt < FileSize; BuffCnt++){
-		SourceAddress[BuffCnt] = TEST + BuffCnt;
-//		if(BuffCnt < 512)
-//			myData512[BuffCnt] = TEST + BuffCnt;
-	}
-//	for(it = 0; it < 12288; it++)
-//	{
-//		myArray2[it] = TEST + it;
-//	}
-/*	for(it = 0; it < 512; it++)	//this works to set the values for ints to increasing values
+	//Test out bitwise things
+
+	/*u8 b1 = 0;
+	u8 b2 = 0;
+	u8 b3 = 0;
+	u8 b4 = 0;
+//	u8 bitmaskzero = 0;
+//	u8 bitmaskones = 255;
+	u8 myintholder = 0;
+	//u32 myint = 123;
+	int ii = 0;
+
+	u32 numtest = 4279234730U;	//the "U" specifies to the compiler that this is an unsigned 32 bit constant
+	for(ii = 0; ii < 4; ii++)
 	{
-		if(it < 256)
+		myintholder = numtest >> (ii * 8);	//this worked!!
+		xil_printf("u:%u ",myintholder);
+	}
+	//alternatively
+	b4 = numtest >> (8*0);	//saves the least 8 least significant bits
+	b3 = numtest >> (8*1);
+	b2 = numtest >> (8*2);
+	b1 = numtest >> (8*3);
+	xil_printf("\r\nu:%u_%u_%u_%u\r\n",b1,b2,b3,b4);*/
+
+	//end bitwise test
+	int flipper = 0;
+	BuffCnt = 0;
+	while(BuffCnt < 2048)	//test data set = 111111, 121212, 131313, ...
+	{
+		switch(flipper)
 		{
-			myData256[it] = it;
-			myData512[it] = it;
+		case 0:								//"	3 1 178	7 "
+			testdata[BuffCnt] = 50442759;	//"00000011 00000001 10110010 00000111"
+			flipper++;
+			break;
+		case 1:								//" 3 1 217 124 "
+			testdata[BuffCnt] = 50452860;	//"00000011 00000001 11011001 01111100"
+			flipper++;
+			break;
+		case 2:								//" 3 2 0 241 "
+			testdata[BuffCnt] = 50462961;	//"00000011 00000010 00000000 11110001"
+			flipper = 0;
+			break;
+		default:
+			xil_printf("WTF\r\n");
+			break;
 		}
-		else
-			myData512[it] = it;
-	} */
+		BuffCnt++;
+	}
+
+	for(BuffCnt = 0; BuffCnt < 2048; BuffCnt++)	//test data set broken into 4 pieces per datum
+	{
+		testpieces[BuffCnt * 4 + 0] = testdata[BuffCnt] >> (8 * 3);
+		testpieces[BuffCnt * 4 + 1] = testdata[BuffCnt] >> (8 * 2);
+		testpieces[BuffCnt * 4 + 2] = testdata[BuffCnt] >> (8 * 1);
+		testpieces[BuffCnt * 4 + 3] = testdata[BuffCnt] >> (8 * 0);
+	}
+
+	for(BuffCnt = 0; BuffCnt < FileSize; BuffCnt++){	//example data set
+		SourceAddress[BuffCnt] = TEST + BuffCnt;
+	}
+
 	/*
 	 * Register volume work area, initialize device
 	 */
-	Res = f_mount(&fatfs, "0", 0);
+	Res = f_mount(&fatfs, Path, 0);	//can also use "0" for the second variable input
 
 	if (Res != FR_OK) {
+		xil_printf("1 %d\r\n",Res);
 		return XST_FAILURE;
 	}
 
@@ -221,57 +265,82 @@ int FfsSdPolledExample(void)
 	 */
 	SD_File = (char *)FileName;
 
-	Res = f_open(&fil, SD_File, FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+//	Res = f_open(&fil2, "fil2test.txt", FA_OPEN_ALWAYS | FA_WRITE);
+//	Res = f_lseek(&fil2, file_size(&fil2));
+//	Res = f_write(&fil2, myData256, 256, &NumBytesWritten);//myData256
+//	xil_printf("bw: %d",NumBytesWritten);
+//	Res = f_close(&fil2);
+
+	Res = f_open(&fil, SD_File, FA_CREATE_ALWAYS | FA_WRITE | FA_READ);
 	if (Res) {
+		xil_printf("2 %d\r\n",Res);
 		return XST_FAILURE;
 	}
 	/*
 	 * Check the Time Stamp
 	 */
-	Res = f_stat(SD_File, &fno);
-	xil_printf("Timestamp: %u/%02u/%02u, %02u:%02u\r\n", (fno.fdate >> 9) + 1980, fno.fdate >> 5 & 15, fno.fdate & 31, fno.ftime >> 11, fno.ftime >> 5 & 63);
-	/*
-	 * Change the time stamp on the file.
-	 */
-	//f_utime (const TCHAR* path, const FILINFO* fno);
-	int year = 2017;
-	int month = 2;
-	int mday = 2;
-	int hour = 2;
-	int min = 2;
-	int sec = 2;
-
-	fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | mday);
-	fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
-
-	Res = f_utime(SD_File, &fno);
-	if (Res)
-		return XST_FAILURE;
-
-	xil_printf("Timestamp: %u/%02u/%02u, %02u:%02u\r\n", (fno.fdate >> 9) + 1980, fno.fdate >> 5 & 15, fno.fdate & 31, fno.ftime >> 11, fno.ftime >> 5 & 63);
+//	Res = f_stat(SD_File, &fno);
+//	xil_printf("Timestamp: %u/%02u/%02u, %02u:%02u\r\n", (fno.fdate >> 9) + 1980, fno.fdate >> 5 & 15, fno.fdate & 31, fno.ftime >> 11, fno.ftime >> 5 & 63);
+//	/*
+//	 * Change the time stamp on the file.
+//	 */
+//	//f_utime (const TCHAR* path, const FILINFO* fno);
+//	int year = 2017;
+//	int month = 2;
+//	int mday = 2;
+//	int hour = 2;
+//	int min = 2;
+//	int sec = 2;
+//
+//	fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | mday);
+//	fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
+//
+//	Res = f_utime(SD_File, &fno);
+//	if (Res)
+//	{
+//		xil_printf("3\r\n");
+//		return XST_FAILURE;
+//	}
+//
+//	xil_printf("Timestamp: %u/%02u/%02u, %02u:%02u\r\n", (fno.fdate >> 9) + 1980, fno.fdate >> 5 & 15, fno.fdate & 31, fno.ftime >> 11, fno.ftime >> 5 & 63);
 
 	/*
 	 * Pointer to beginning of file .
 	 */
-	Res = f_lseek(&fil, 0);
+	Res = f_lseek(&fil, file_size(&fil));	//file size should be 0; can replace the macro with 0
 	if (Res) {
+		xil_printf("4 %d\r\n",Res);
 		return XST_FAILURE;
 	}
 
 	/*
 	 * Write data to file.
 	 */
-	Res = f_write(&fil, (const void*)SourceAddress, FileSize,
-			&NumBytesWritten);
+	Res = f_write(&fil, (const void*)testpieces, FileSize, &NumBytesWritten);
 	if (Res) {
+		xil_printf("5 %d\r\n",Res);
 		return XST_FAILURE;
 	}
-
+	/*
+	 * Close file.
+	 */
+//	Res = f_close(&fil);
+//	if (Res) {return XST_FAILURE;}
+//
+//	/*
+//	 * Open the file again
+//	 */
+//	Res = f_open(&fil, SD_File, FA_READ);
+//	if (Res) {
+//		xil_printf("22\r\n");
+//		return XST_FAILURE;
+//	}
 	/*
 	 * Pointer to beginning of file .
 	 */
 	Res = f_lseek(&fil, 0);
 	if (Res) {
+		xil_printf("6 %d\r\n",Res);
 		return XST_FAILURE;
 	}
 
@@ -281,6 +350,7 @@ int FfsSdPolledExample(void)
 	Res = f_read(&fil, (void*)DestinationAddress, FileSize,
 			&NumBytesRead);
 	if (Res) {
+		xil_printf("7 %d\r\n",Res);
 		return XST_FAILURE;
 	}
 
@@ -288,64 +358,25 @@ int FfsSdPolledExample(void)
 	 * Data verification
 	 */
 	if(NumBytesRead != NumBytesWritten)
+	{
+		xil_printf("8 %d\r\n",Res);
 		return XST_FAILURE;
-
-	for(BuffCnt = 0; BuffCnt < FileSize; BuffCnt++){
-		if(SourceAddress[BuffCnt] != DestinationAddress[BuffCnt]){
+	}
+	for(BuffCnt = FileSize; BuffCnt < FileSize; BuffCnt++){	//just look at the final 10k values
+		if(SourceAddress[BuffCnt] != DestinationAddress[BuffCnt])
+		{
+			whatishere = SourceAddress[BuffCnt];
+			whatishere2 = DestinationAddress[BuffCnt];
+			xil_printf("buffcnt: %d\r\n",BuffCnt);
+			xil_printf("9 %d\r\n",Res);
 			return XST_FAILURE;
 		}
 	}
-
-	fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | mday);
-	fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
-
-	Res = f_utime(SD_File, &fno);
-	if (Res)
-		return XST_FAILURE;
-
-	xil_printf("Timestamp: %u/%02u/%02u, %02u:%02u\r\n", (fno.fdate >> 9) + 1980, fno.fdate >> 5 & 15, fno.fdate & 31, fno.ftime >> 11, fno.ftime >> 5 & 63);
 	/*
 	 * Close file.
 	 */
 	Res = f_close(&fil);
 	if (Res) {return XST_FAILURE;}
-
-	//Write progressively larger buffers until one of them writes properly
-	//256 bytes
-//	Res = f_open(&fil5, "test512.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-//	if (Res) {return XST_FAILURE;}
-//
-//	Res = f_write(&fil5, (const void *)myData512, 512, &NumBytesWritten);
-//	if (Res) {return XST_FAILURE;}
-//
-//	Res = f_close(&fil5);
-//	if (Res) {return XST_FAILURE;}
-//
-//	int index = 0;
-///*	unsigned int * myArray;
-//	myArray = (unsigned int *)calloc(SIZEOF_DATA_ARRAY, sizeof(unsigned int));
-//
-//	for(index = 0; index < SIZEOF_DATA_ARRAY; index++)
-//	{
-//		if((index % 2) == 0)
-//			myArray[index] = 3;
-//		else
-//			myArray[index] = 4;
-//	} */
-//
-//	Res = f_open(&fil6, "lrgtest2.bin", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);	//removed the (const void *)
-//	Res = f_lseek(&fil6, SIZEOF_DATA_ARRAY);
-//	Res = f_lseek(&fil6, 0);
-//
-////	for(index = 0; index < 24; index++)	//write 24 512 byte blocks
-////	{
-//		Res = f_write(&fil6, (const void *)myArray2, SIZEOF_DATA_ARRAY, &NumBytesWritten);
-////		Res = f_sync(&fil6);
-////	}
-//	Res = f_close(&fil6);
-
-	//free(myArray);
-	//myArray = NULL;
 
 	return XST_SUCCESS;
 }
