@@ -77,9 +77,6 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 //	int readPtrAA = 0;
 //	//char cDone[8] = "141414\n";
 //	char data[20] = "";
-	int * iDataBuffer;
-	iDataBuffer = (int *)calloc(49160 / 4, sizeof(int));	//49160 is the range of memory addresses we are reading from in the DRAM(in bytes), each memory chunk holds an int (4 bytes)
-
 
 	if (!p)
 	{
@@ -124,6 +121,7 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 		if(buffer[0] == 'a')
 		{
 			xil_printf("continue");
+
 		}
 //		else if(buffer[0] == 'b')
 //		{

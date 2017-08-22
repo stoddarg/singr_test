@@ -40,6 +40,7 @@ XGpioPs_Config *GPIOConfigPtr;
 XScuGic InterruptController;
 static XScuGic_Config *GicConfig;
 
+static u32 testdata[12288] = {};
 int g_iTestCounter;	//global test counter variable
 
 int main()
@@ -199,70 +200,6 @@ echo_netif = &server_netif;
 		doMount = 1;
 	}
 	//****************** Mount SD Card *****************//
-
-	//****************** Write to SD Card *****************//
-/*	int iterator = 0;
-	unsigned int numBytesWritten = 0;
-	unsigned int numBytesRead = 0;
-	unsigned char myData256[256] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-	unsigned char myData512[512] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-	unsigned char myBuff2[512] = "";
-
-	FRESULT Res = FR_OK;
-	FIL fil;
-	FIL fil2;
-	FILINFO finfo;
-
-	Res = f_open(&fil, "ft.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-
-	Res = f_write(&fil, myData256, 256, &numBytesRead);
-
-	Res = f_close(&fil);
-
-	while(1)
-	{
-		Res = f_open(&fil2, "Test123.txt", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);		//open only if the file exists
-		if (Res) {break;}
-
-		Res = f_write(&fil2, (const void *)myData512, sizeof(myData512), &numBytesWritten);	//Write some ints to the file in binary
-		if (Res) {break;}
-
-		Res = f_close(&fil2);															//close the file
-		if (Res) {break;}
-
-		Res = f_open(&fil2, "Test123.txt", FA_READ);									//open the file read only
-		if (Res) {break;}
-
-		Res = f_read(&fil2, myBuff2, 512, &numBytesRead);								//read back from it
-		if (Res) {break;}
-
-		Res = f_close(&fil2);															//close the file
-		if (Res) {break;}
-
-		if(numBytesWritten == numBytesRead)
-			break;
-
-		++iterator;
-		sleep(1);
-	} */
-	//****************** Write to SD Card *****************//
-
-//	xil_printf("Res: %d\r\n",Res);
-
-	//Testing for dynamic allocation of arrays
-//	int * testarray = NULL;							//Update the linker script in Echo3/src to adjust the size of the heap; if it's too small, then we can't allocate this
-//	testarray = (int *)calloc(10000, sizeof(int));	//10 000 * sizeof(int) is too large to allocate dynamically
-//	if(testarray == NULL)
-//		xil_printf("Could not allocate array\r\n");
-//
-//	testarray[10] = 11;
-//	testarray[55] = 56;
-//	testarray[567] = 88;
-//
-//	xil_printf("%d_%d_%d_%d_%d\r\n",testarray[1],testarray[10],testarray[55],testarray[99],testarray[567]);
-//
-//	free(testarray);
-//	testarray = NULL;
 
 	// *********** Setup the Hardware Reset GPIO ****************//
 	GPIOConfigPtr = XGpioPs_LookupConfig(XPAR_PS7_GPIO_0_DEVICE_ID);
@@ -431,7 +368,7 @@ echo_netif = &server_netif;
 //			PrintData();
 //			break;
 		case 9: //Print DMA Data
-           ether();
+			ether();
 			break;
 		default :
 			break;
@@ -663,28 +600,50 @@ int PrintData( ){
 	int dram_addr = 0;
 	int dram_base = 0xa000000;		// 167772160
 	int dram_ceiling = 0xa00c000;	// 167821312 - 167772160 = 49152
-	unsigned int * data_array = NULL;
-	data_array = calloc(SIZEOF_DATA_ARRAY, sizeof(unsigned int));	//dynamically allocate buffer to save on stack space
-	if(data_array == NULL)											//check we have allocated the buffer
-		return 1;
+
 	FRESULT ffres;
+	//FRESULT ffres1;
 	uint numBytesWritten = 0;
 	FIL datafile;
 
 	Xil_DCacheInvalidateRange(0x00000000, 65536);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer
 
-	for (dram_addr = dram_base; dram_addr <= dram_ceiling; dram_addr+=4, index++){	//read over the addresses and save into an array to save to SD
-		data_array[index] = Xil_In32(dram_addr);
+	//Save to SD card here
+	ffres = f_open(&datafile, "datatest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	if(ffres != FR_OK) {
+		xil_printf("1 %d\r\n",ffres);
+		return 1;
 	}
 
-	//Save to SD card here
-	ffres = f_open(&datafile, "datatest.txt", FA_OPEN_ALWAYS | FA_WRITE);
 	ffres = f_lseek(&datafile, file_size(&datafile));
-	ffres = f_write(&datafile, data_array, SIZEOF_DATA_ARRAY, &numBytesWritten);
-	ffres = f_close(&datafile);
+	if(ffres != FR_OK) {
+		xil_printf("2 %d\r\n",ffres);
+		return 1;
+	}
+	xil_printf("\r\n%d\r\n",file_size(&datafile));
 
-	free(data_array);
-	data_array = NULL;
+	dram_addr = dram_base;
+	while(dram_addr <= dram_ceiling)
+	{
+		testdata[index] = Xil_In32(dram_addr);
+		index++;
+		dram_addr += 4;
+		if(index == 3072)
+		{
+			ffres = f_write(&datafile, testdata, 12288, &numBytesWritten);	//write the data
+			if(ffres != FR_OK) {
+				xil_printf("3 %d\r\n",ffres);
+				return 1;
+			}
+			index = 0;														//reuse the array that we have been using
+		}
+	}
+
+	ffres = f_close(&datafile);	//close the file
+	if(ffres != FR_OK) {
+		xil_printf("4 %d\r\n",ffres);
+		return 1;
+	}
 	return sw;
 }
 //////////////////////////// PrintData ////////////////////////////////
@@ -700,9 +659,6 @@ int PrintData( ){
 
 //////////////////////////// DAQ ////////////////////////////////
 int DAQ(){
-
-	xil_printf("\r\nDAQ is looping\r\n");
-
 	Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
 	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
 	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);		//and how much to transfer
@@ -720,7 +676,6 @@ int DAQ(){
 //////////////////////////// DAQ ////////////////////////////////
 
 int ether(){
-	int timer = 0;
 	GPIOConfigPtr = XGpioPs_LookupConfig(XPAR_PS7_GPIO_0_DEVICE_ID);
 	Status = XGpioPs_CfgInitialize(&Gpio, GPIOConfigPtr, GPIOConfigPtr ->BaseAddr);
 	if (Status != XST_SUCCESS) {
@@ -734,11 +689,9 @@ int ether(){
 	while (g_txcomplete == 1) {
 		sw = XGpioPs_ReadPin(&Gpio, etherStop); //read pin
 
-		if (sw == 1) { //sw=1 when switch is pushed
-			g_txcomplete = 0; //invert value stored in toggle
-			//continue; //break out and stop looping
+		if (sw == 1)			//sw=1 when switch is pushed
+			g_txcomplete = 0;	//invert value stored in toggle
 
-		}
 		if (TcpFastTmrFlag) {
 			tcp_fasttmr();
 			TcpFastTmrFlag = 0;
@@ -747,14 +700,13 @@ int ether(){
 			tcp_slowtmr();
 			TcpSlowTmrFlag = 0;
 		}
-		xemacif_input(echo_netif);
-		//transfer_data();	//Put printData here so that we send data each time
-		//usleep(500000);
-		DAQ();
-		if(timer++ >= 100)
-			break;
+
+		xemacif_input(echo_netif);				//look for ethernet input (from the GUI)
+
+		if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR))	//if the AA integrator buffer is full
+			DAQ();								//go and grab the data
 	}
-	xil_printf("Broke out after 100 loops\r\n");
+	xil_printf("Broke out after 10 loops\r\n");
 
 	/* Never reached */
 	return 0;

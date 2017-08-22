@@ -89,13 +89,9 @@ int FfsSdPolledExample(void);
 
 /************************** Variable Definitions *****************************/
 static FIL fil;		/* File object */
-FIL fil2;
-//static FIL fil5;
-//static FIL fil6;
+static FIL fil2;
 static FATFS fatfs;
-//static FILINFO fno;
 static char FileName[32] = "test007.bin";
-//static char FileName2[32] = "ft.txt";
 static char *SD_File;
 u32 Platform;
 static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
@@ -307,7 +303,7 @@ int FfsSdPolledExample(void)
 	/*
 	 * Pointer to beginning of file .
 	 */
-	Res = f_lseek(&fil, file_size(&fil));	//file size should be 0; can replace the macro with 0
+	Res = f_lseek(&fil, file_size(&fil));	//file size should be 0 if it is new; can replace the macro with 0
 	if (Res) {
 		xil_printf("4 %d\r\n",Res);
 		return XST_FAILURE;
@@ -362,21 +358,29 @@ int FfsSdPolledExample(void)
 		xil_printf("8 %d\r\n",Res);
 		return XST_FAILURE;
 	}
-	for(BuffCnt = FileSize; BuffCnt < FileSize; BuffCnt++){	//just look at the final 10k values
-		if(SourceAddress[BuffCnt] != DestinationAddress[BuffCnt])
-		{
-			whatishere = SourceAddress[BuffCnt];
-			whatishere2 = DestinationAddress[BuffCnt];
-			xil_printf("buffcnt: %d\r\n",BuffCnt);
-			xil_printf("9 %d\r\n",Res);
-			return XST_FAILURE;
-		}
-	}
+//	for(BuffCnt = FileSize; BuffCnt < FileSize; BuffCnt++){	//just look at the final 10k values
+//		if(SourceAddress[BuffCnt] != DestinationAddress[BuffCnt])
+//		{
+//			whatishere = SourceAddress[BuffCnt];
+//			whatishere2 = DestinationAddress[BuffCnt];
+//			xil_printf("buffcnt: %d\r\n",BuffCnt);
+//			xil_printf("9 %d\r\n",Res);
+//			return XST_FAILURE;
+//		}
+//	}
 	/*
 	 * Close file.
 	 */
 	Res = f_close(&fil);
 	if (Res) {return XST_FAILURE;}
+
+
+	Res = f_open(&fil2, "fil2.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	Res = f_lseek(&fil2, file_size(&fil2));
+	//Res = f_write(&fil2, testdata, 2048, &NumBytesWritten);	//this will only write as much data as we tell it to; an array of 2048 u32's will be 8192 bytes!
+	Res = f_write(&fil2, testdata, 8192, &NumBytesWritten);
+	xil_printf("\r\nbw: %d\r\n",NumBytesWritten);
+	Res = f_close(&fil2);
 
 	return XST_SUCCESS;
 }
