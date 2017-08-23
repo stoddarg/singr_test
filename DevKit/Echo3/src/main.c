@@ -40,7 +40,7 @@ XGpioPs_Config *GPIOConfigPtr;
 XScuGic InterruptController;
 static XScuGic_Config *GicConfig;
 
-static u32 testdata[12288] = {};
+static u32 testdata[LENGTH_DATA_ARRAY] = {};
 int g_iTestCounter;	//global test counter variable
 
 int main()
@@ -622,14 +622,14 @@ int PrintData( ){
 	xil_printf("\r\n%d\r\n",file_size(&datafile));
 
 	dram_addr = dram_base;
-	while(dram_addr <= dram_ceiling)
+	while(dram_addr <= dram_ceiling)	//will loop over 49152/4 addresses = 12288
 	{
-		testdata[index] = Xil_In32(dram_addr);
+		testdata[index] = Xil_In32(dram_addr);	//grab the int from DRAM
 		index++;
 		dram_addr += 4;
-		if(index == 3072)
+		if(index == 4096)						//if the array is full
 		{
-			ffres = f_write(&datafile, testdata, 12288, &numBytesWritten);	//write the data
+			ffres = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
 			if(ffres != FR_OK) {
 				xil_printf("3 %d\r\n",ffres);
 				return 1;
@@ -675,6 +675,11 @@ int DAQ(){
 //////////////////////////// DAQ ////////////////////////////////
 
 int ether(){
+	int iter = 0;
+	XTime tStart = 0; XTime tEnd = 0;
+	double times[100] = {};
+	int gpio[100] = {};
+
 	GPIOConfigPtr = XGpioPs_LookupConfig(XPAR_PS7_GPIO_0_DEVICE_ID);
 	Status = XGpioPs_CfgInitialize(&Gpio, GPIOConfigPtr, GPIOConfigPtr ->BaseAddr);
 	if (Status != XST_SUCCESS) {
@@ -702,12 +707,19 @@ int ether(){
 
 		xemacif_input(echo_netif);				//look for ethernet input (from the GUI)
 
-		if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR))	//if the AA integrator buffer is full
+		if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) == 32767)	//if the AA integrator buffer is full, Xil_In32() = 1 == true
+		{
+			gpio[iter] = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);
+			XTime_GetTime(&tStart);
 			DAQ();								//go and grab the data
+			XTime_GetTime(&tEnd);
+			times[iter] = 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000);
+			iter++;
+		}
 	}
+
 	xil_printf("Broke out after 10 loops\r\n");
 
-	/* Never reached */
 	return 0;
 }
 

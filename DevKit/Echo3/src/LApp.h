@@ -24,12 +24,14 @@
 #include "LDetector.h"
 #include "LModule.h"
 #include "globals.h"
+#include "xtime_l.h"
 
 #include "xparameters.h"
 #include "xsdps.h"
 #include "ff.h"					//Fat File System header
 #include "xil_cache.h"
 #include "xplatform_info.h"
+#include "lwip\init.h"				//lwip_init() header
 
 #include "readEtherPoll.h"
 
@@ -37,7 +39,8 @@
 /* Globals */
 #define UART_DEVICEID      XPAR_XUARTPS_0_DEVICE_ID
 #define SW_BREAK_GPIO		51
-#define SIZEOF_DATA_ARRAY	12288
+#define LENGTH_DATA_ARRAY	4096
+#define SIZEOF_DATA_ARRAY	16384
 //size of data array is the number of integers read in from the FPGA // this number is divisible by 256, 12288 / 256 = 48
 
 // Hardware Interface

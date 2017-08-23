@@ -42,6 +42,9 @@
 #include "xsdps.h"	/* SD device driver */
 #include "ff.h"		/* SD Function Header */
 
+#define LENGTH_DATA_ARRAY	4096
+#define SIZEOF_DATA_ARRAY	16384
+
 #if defined (__arm__) || defined (__aarch64__)
 #include "xil_printf.h"
 #endif
@@ -54,7 +57,7 @@ int g_iBytesRead;	//global test counter variable
 
 //SD Card Variables
 static FIL fil2;
-static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
+static u32 testdata[LENGTH_DATA_ARRAY] = {};// __attribute__ ((aligned(32)));
 
 int transfer_data(struct tcp_pcb *tpcb) {
 
@@ -111,16 +114,42 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 			while(tcp_sndbuf(tpcb) < 65535){	//wait until the send buffer is clear and ready
 			}
 
-			ffres = f_open(&fil2, "test007.bin", FA_OPEN_EXISTING | FA_READ);
-			ffres = f_lseek(&fil2, g_iBytesRead);
-			ffres = f_read(&fil2, testdata, 8192, &NumBytesRead);
-			g_iBytesRead += NumBytesRead;								//keep track of where we are in the file
+			ffres = f_open(&fil2, "datatest.bin", FA_OPEN_EXISTING | FA_READ);
+			if(ffres != FR_OK) {
+				xil_printf("11 %d\r\n",ffres);
+				return 1;
+			}
+
+			ffres = f_lseek(&fil2, g_iBytesRead);	//set to 0 at the beginning of main(), updated after we read from the file
+			if(ffres != FR_OK) {
+				xil_printf("22 %d\r\n",ffres);
+				return 1;
+			}
+
+			ffres = f_read(&fil2, testdata, SIZEOF_DATA_ARRAY, &NumBytesRead);	//read out data from the file
+			if(ffres != FR_OK) {
+				xil_printf("33 %d\r\n",ffres);
+				return 1;
+			}
+			g_iBytesRead += NumBytesRead;										//keep track of where we are in the file
 
 			//queue up the data in the tcp_sndbuf
-			err = tcp_write(tpcb, (void*)testdata, 8192, 0x01);			//write in the buffer we read from the file
-			err = tcp_write(tpcb, (void*)cDone, strlen(cDone), 0x01);	//put in a 'finished' set of bytes
+			err = tcp_write(tpcb, (void*)testdata, SIZEOF_DATA_ARRAY, 0x01);	//write in the buffer we read from the file
+			if(ffres != FR_OK) {
+				xil_printf("44 %d\r\n",ffres);
+				return 1;
+			}
+			err = tcp_write(tpcb, (void*)cDone, strlen(cDone), 0x01);			//put in a 'finished' set of bytes
+			if(ffres != FR_OK) {
+				xil_printf("55 %d\r\n",ffres);
+				return 1;
+			}
 
 			ffres = f_close(&fil2);
+			if(ffres != FR_OK) {
+				xil_printf("66 %d\r\n",ffres);
+				return 1;
+			}
 		}
 	}
 	else	//Otherwise come here for the polling loop

@@ -72,8 +72,7 @@
 #include "ff.h"
 #include "xil_cache.h"
 #include "xplatform_info.h"
-
-#include "xtime_l.h"
+#include "sleep.h"
 
 #define SIZEOF_DATA_ARRAY	12288
 
@@ -91,7 +90,7 @@ int FfsSdPolledExample(void);
 static FIL fil;		/* File object */
 static FIL fil2;
 static FATFS fatfs;
-static char FileName[32] = "test007.bin";
+static char FileName[32] = "test008.bin";
 static char *SD_File;
 u32 Platform;
 static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
@@ -124,10 +123,8 @@ u8 SourceAddress[10*1024] __attribute__ ((aligned(32)));
 int main(void)
 {
 	int Status;
-	XTime tStart, tEnd;
 
 	xil_printf("SD Polled File System Example Test \r\n");
-	XTime_GetTime(&tStart);
 
 	Status = FfsSdPolledExample();
 	if (Status != XST_SUCCESS) {
@@ -135,11 +132,7 @@ int main(void)
 		return XST_FAILURE;
 	}
 
-	XTime_GetTime(&tEnd);
 	xil_printf("Successfully ran SD Polled File System Example Test \r\n");
-
-	xil_printf("Output took %llu clock cycles\r\n", 2*(tEnd - tStart));
-	xil_printf("To get time, in us, divide by %llu / 1000000", COUNTS_PER_SECOND);
 
 	return XST_SUCCESS;
 
@@ -168,8 +161,8 @@ int FfsSdPolledExample(void)
 	u32 BuffCnt;
 	u32 FileSize = (8*1024);
 	TCHAR *Path = "0:/";
-	int whatishere = 0;
-	int whatishere2 = 0;
+//	int whatishere = 0;
+//	int whatishere2 = 0;
 
 	Platform = XGetPlatform_Info();
 	if (Platform == XPLAT_ZYNQ_ULTRA_MP) {
@@ -375,7 +368,7 @@ int FfsSdPolledExample(void)
 	if (Res) {return XST_FAILURE;}
 
 
-	Res = f_open(&fil2, "fil2.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	Res = f_open(&fil2, "fil22.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 	Res = f_lseek(&fil2, file_size(&fil2));
 	//Res = f_write(&fil2, testdata, 2048, &NumBytesWritten);	//this will only write as much data as we tell it to; an array of 2048 u32's will be 8192 bytes!
 	Res = f_write(&fil2, testdata, 8192, &NumBytesWritten);
