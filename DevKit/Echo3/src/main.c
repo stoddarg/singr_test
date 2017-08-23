@@ -48,7 +48,6 @@ int main()
 	// Local Variables for main()
 	int i = 0;				// index
 	int	menusel = 99999;	// Menu Select
-	//int mode = 9;			// Mode of Operation
 	int enable_state = 0; 	// 0: disabled, 1: enabled
 	int thres = 0;			// Trigger Threshold
 	//char updateint = 'N';	// switch to change integral values
