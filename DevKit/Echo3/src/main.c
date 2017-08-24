@@ -40,7 +40,8 @@ XGpioPs_Config *GPIOConfigPtr;
 XScuGic InterruptController;
 static XScuGic_Config *GicConfig;
 
-static u32 testdata[LENGTH_DATA_ARRAY] = {};
+//static u32 testdata[LENGTH_DATA_ARRAY] = {};
+static int testdata[LENGTH_DATA_ARRAY] = {};
 int g_iTestCounter;	//global test counter variable
 
 int main()
@@ -677,8 +678,9 @@ int DAQ(){
 int ether(){
 	int iter = 0;
 	XTime tStart = 0; XTime tEnd = 0;
+	double mytime = 0.0;
 	double times[100] = {};
-	int gpio[100] = {};
+//	int gpio[100] = {};
 
 	GPIOConfigPtr = XGpioPs_LookupConfig(XPAR_PS7_GPIO_0_DEVICE_ID);
 	Status = XGpioPs_CfgInitialize(&Gpio, GPIOConfigPtr, GPIOConfigPtr ->BaseAddr);
@@ -686,9 +688,8 @@ int ether(){
 		return XST_FAILURE;
 	}
 	XGpioPs_SetDirectionPin(&Gpio, etherStop, 1);
-	int sw;
+	int sw = 0;
 
-	//	a = pbuf_free_ooseq_queued;
 	g_txcomplete = 1;
 	while (g_txcomplete == 1) {
 		sw = XGpioPs_ReadPin(&Gpio, etherStop); //read pin
@@ -705,20 +706,29 @@ int ether(){
 			TcpSlowTmrFlag = 0;
 		}
 
+		XTime_GetTime(&tStart);
 		xemacif_input(echo_netif);				//look for ethernet input (from the GUI)
+		XTime_GetTime(&tEnd);
+		mytime = 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000);
+		if(mytime > 50.0)
+		{
+			times[iter] = mytime;
+			iter++;
+		}
 
 		if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) == 32767)	//if the AA integrator buffer is full, Xil_In32() = 1 == true
 		{
-			gpio[iter] = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);
-			XTime_GetTime(&tStart);
+//			gpio[iter] = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);
+//			XTime_GetTime(&tStart);
 			DAQ();								//go and grab the data
-			XTime_GetTime(&tEnd);
-			times[iter] = 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000);
-			iter++;
+//			XTime_GetTime(&tEnd);
+//			times[iter] = 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000);
+//			iter++;
 		}
 	}
 
 	xil_printf("Broke out after 10 loops\r\n");
+//	cleanup_platform();
 
 	return 0;
 }

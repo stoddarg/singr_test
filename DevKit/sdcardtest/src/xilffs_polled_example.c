@@ -93,7 +93,9 @@ static FATFS fatfs;
 static char FileName[32] = "test008.bin";
 static char *SD_File;
 u32 Platform;
-static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
+//static u32 testdata[2048] = {};// __attribute__ ((aligned(32)));
+static int testdata[2048] = {};
+static int readtestdata[2048] = {};
 static u8 testpieces[8192] = {};//__attribute__ ((aligned(32)));
 
 #ifdef __ICCARM__
@@ -206,15 +208,15 @@ int FfsSdPolledExample(void)
 		switch(flipper)
 		{
 		case 0:								//"	3 1 178	7 "
-			testdata[BuffCnt] = 50442759;	//"00000011 00000001 10110010 00000111"
+			testdata[BuffCnt] = 111111;	//"00000011 00000001 10110010 00000111"
 			flipper++;
 			break;
 		case 1:								//" 3 1 217 124 "
-			testdata[BuffCnt] = 50452860;	//"00000011 00000001 11011001 01111100"
+			testdata[BuffCnt] = 121212;	//"00000011 00000001 11011001 01111100"
 			flipper++;
 			break;
 		case 2:								//" 3 2 0 241 "
-			testdata[BuffCnt] = 50462961;	//"00000011 00000010 00000000 11110001"
+			testdata[BuffCnt] = 131313;	//"00000011 00000010 00000000 11110001"
 			flipper = 0;
 			break;
 		default:
@@ -368,11 +370,36 @@ int FfsSdPolledExample(void)
 	if (Res) {return XST_FAILURE;}
 
 
-	Res = f_open(&fil2, "fil22.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	Res = f_open(&fil2, "filints.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 	Res = f_lseek(&fil2, file_size(&fil2));
 	//Res = f_write(&fil2, testdata, 2048, &NumBytesWritten);	//this will only write as much data as we tell it to; an array of 2048 u32's will be 8192 bytes!
 	Res = f_write(&fil2, testdata, 8192, &NumBytesWritten);
 	xil_printf("\r\nbw: %d\r\n",NumBytesWritten);
+	Res = f_close(&fil2);
+
+	Res = f_open(&fil2, "filints.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+
+	//test for loop reading
+	NumBytesRead = 0;
+	int ii = 0;
+	int t1,t2,t3,t4;
+	for(ii = 0; ii<4; ii++)
+	{
+		Res = f_read(&fil2, readtestdata + NumBytesRead, 8192/4, &NumBytesRead);
+
+	}
+	//compare the two
+	for(BuffCnt = 0; BuffCnt < 2048; BuffCnt++)
+	{
+		if(testdata[BuffCnt] != readtestdata[BuffCnt])
+		{
+			t1 = testdata[BuffCnt];
+			t2 = testdata[BuffCnt+1];
+			t3 = readtestdata[BuffCnt];
+			t4 = readtestdata[BuffCnt+1];
+			return XST_FAILURE;
+		}
+	}
 	Res = f_close(&fil2);
 
 	return XST_SUCCESS;

@@ -53,11 +53,12 @@ struct tcp_pcb *globalTCP_pcb;	//global struct
 int g_menuSel;			//global menu variable
 int g_buffer_addr;
 
-int g_iBytesRead;	//global test counter variable
+//int g_iBytesRead;	//global test counter variable
 
 //SD Card Variables
 static FIL fil2;
-static u32 testdata[LENGTH_DATA_ARRAY] = {};// __attribute__ ((aligned(32)));
+//static u32 testdata[LENGTH_DATA_ARRAY] = {};// __attribute__ ((aligned(32)));
+static int testdata[LENGTH_DATA_ARRAY] = {};
 
 int transfer_data(struct tcp_pcb *tpcb) {
 
@@ -74,9 +75,11 @@ void print_app_header()
 err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
 	/* set variables */
+	int iter = 0;
 	char * buffer = NULL;
 	char * pEnd = NULL;
-	char cDone[8] = "141414\n";
+//	char cDone[8] = "141414\n";
+//	int minitestarray[10] = {72,69,76,76,79,43,102,42,42,42};
 	FRESULT ffres;
 	uint NumBytesRead = 0;
 
@@ -120,31 +123,22 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 				return 1;
 			}
 
-			ffres = f_lseek(&fil2, g_iBytesRead);	//set to 0 at the beginning of main(), updated after we read from the file
+			if(file_size(&fil2) < 49152)	//if the file has not been written to, don't try and read it
+			{
+				ffres = f_close(&fil2);
+				return 1;
+			}
+			ffres = f_lseek(&fil2, (file_size(&fil2) - 49152));	//will read the most recent data in the file
 			if(ffres != FR_OK) {
 				xil_printf("22 %d\r\n",ffres);
 				return 1;
 			}
 
-			ffres = f_read(&fil2, testdata, SIZEOF_DATA_ARRAY, &NumBytesRead);	//read out data from the file
-			if(ffres != FR_OK) {
-				xil_printf("33 %d\r\n",ffres);
-				return 1;
+			for(iter = 0; iter < 2; iter++)	//works with iter=2 not iter=3
+			{
+				ffres = f_read(&fil2, testdata + NumBytesRead, SIZEOF_DATA_ARRAY, &NumBytesRead);	//read out data from the file
+				err = tcp_write(tpcb, (void*)testdata, SIZEOF_DATA_ARRAY, 0x01);	//write in the buffer we read from the file
 			}
-			g_iBytesRead += NumBytesRead;										//keep track of where we are in the file
-
-			//queue up the data in the tcp_sndbuf
-			err = tcp_write(tpcb, (void*)testdata, SIZEOF_DATA_ARRAY, 0x01);	//write in the buffer we read from the file
-			if(ffres != FR_OK) {
-				xil_printf("44 %d\r\n",ffres);
-				return 1;
-			}
-			err = tcp_write(tpcb, (void*)cDone, strlen(cDone), 0x01);			//put in a 'finished' set of bytes
-			if(ffres != FR_OK) {
-				xil_printf("55 %d\r\n",ffres);
-				return 1;
-			}
-
 			ffres = f_close(&fil2);
 			if(ffres != FR_OK) {
 				xil_printf("66 %d\r\n",ffres);
