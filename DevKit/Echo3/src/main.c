@@ -51,7 +51,6 @@ int main()
 	int thres = 0;			// Trigger Threshold
 	int ipollReturn = 0;
 	//char updateint = 'N';	// switch to change integral values
-	u32 databuff = 0;		// size of the data buffer
 
 	// Readout Variables
 	int index = 0;
@@ -74,9 +73,9 @@ int main()
 	pc_ReportBuff2 = (u8 *)calloc(101, sizeof(u8));
 	u8 * pu_testdatapieces;
 	pu_testdatapieces = (u8 *)calloc(49152, sizeof(u8));
-	u8 sendpieces[100] = "";
 	int iSprintfReturn = 0;
 	int bytesSent = 0;
+	int testxilin = 0;
 
 //	for (i=0; i<32; i++ ) { RecvBuffer[i] = '_'; }		// Clear RecvBuffer Variable
 //	for (i=0; i<32; i++ ) { SendBuffer[i] = '_'; }		// Clear SendBuffer Variable
@@ -141,87 +140,73 @@ int main()
 		sw = 0;   //  stop switch reset to 0
 		XUartPs_SetOptions(&Uart_PS,XUARTPS_OPTION_RESET_RX);	// Clear UART Read Buffer
 		memset(RecvBuffer, '\0', 32);
+		menusel = 999;
 
-		sleep(0.5);  // Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 0.5 s
-		xil_printf("\n\r v2.1 \n\r");
-		xil_printf("\n\r MAIN MENU \n\r");
-		xil_printf("******************************\n\r");
-		xil_printf(" 0) Set Mode of Operation\n\r");
-		xil_printf(" 1) Enable or disable the system\n\r");
-		xil_printf(" 2) Continuously Read of Processed Data\n\r");
-		xil_printf("\n\r **Setup Parameters ** \n\r");
-		xil_printf(" 3) Set Trigger Threshold\n\r");
-		xil_printf(" 4) Set Integration Times (number of clock cycles * 4ns) \n\r");
-		xil_printf("\n\r ** Additional Commands ** \n\r");
-		xil_printf(" 5) Perform a DMA transfer of Waveform Data\n\r");
-		xil_printf(" 6) Perform a DMA transfer of Processed Data\n\r");
-		xil_printf(" 7) Check the Size of the Data Buffered (Max = 4095) \n\r");
-		xil_printf(" 8) Clear the Processed Data Buffers\n\r");
-		xil_printf(" 9) Execute Print of Data on DRAM \n\r");
-		xil_printf("******************************\n\n\r");
+//		sleep(0.5);  // Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 0.5 s
+//		xil_printf("\n\r v2.1 \n\r");
+//		xil_printf("\n\r MAIN MENU \n\r");
+//		xil_printf("******************************\n\r");
+//		xil_printf(" 0) Set Mode of Operation\n\r");
+//		xil_printf(" 1) Enable or disable the system\n\r");
+//		xil_printf(" 2) Continuously Read of Processed Data\n\r");
+//		xil_printf("\n\r **Setup Parameters ** \n\r");
+//		xil_printf(" 3) Set Trigger Threshold\n\r");
+//		xil_printf(" 4) Set Integration Times (number of clock cycles * 4ns) \n\r");
+//		xil_printf("\n\r ** Additional Commands ** \n\r");
+//		xil_printf(" 5) Perform a DMA transfer of Waveform Data\n\r");
+//		xil_printf(" 6) Perform a DMA transfer of Processed Data\n\r");
+//		xil_printf(" 7) Check the Size of the Data Buffered (Max = 4095) \n\r");
+//		xil_printf(" 8) Clear the Processed Data Buffers\n\r");
+//		xil_printf(" 9) Execute Print of Data on DRAM \n\r");
+//		xil_printf("******************************\n\n\r");
 		while (XUartPs_IsSending(&Uart_PS)) {i++;}  // Wait until Write Buffer is Sent
+
+//		//test loop
+//		while(1)
+//		{
+//			ipollReturn = PollUart(RecvBuffer, &Uart_PS);	//return value of 97, 113, or 0
+//			if(ipollReturn == 97)	//user sent an "a" and wants to transfer a file	//32 bytes?
+//			{
+//				xil_printf("found an 'a'\r\n");
+//				break;
+//			}
+//		}
 
 		ReadCommandPoll();
 		sscanf(RecvBuffer,"%02u",&menusel);
-		if ( menusel < 0 || menusel > 9 )
-		{
-			xil_printf(" Invalid Command: Enter 0-9 \n\r");
-			sleep(1); 			// Built in Latency + 1 s
-		}
 
 		switch (menusel) { // Switch-Case Menu Select
 
-		case 0: //Set Mode of Operation
-			xil_printf("\n\r Waveform Data: \t Enter 0 <return>\n\r");
-			xil_printf(" LPF Waveform Data: \t Enter 1 <return>\n\r");
-			xil_printf(" DFF Waveform Data: \t Enter 2 <return>\n\r");
-			xil_printf(" TRG Waveform Data: \t Enter 3 <return>\n\r");
-			xil_printf(" Processed Data: \t Enter 4 <return>\n\r");
-
+		case 0:
 			ReadCommandPoll();
 			sscanf(RecvBuffer,"%01u",&mode);
 
-			if (mode < 0 || mode > 4 ) { xil_printf("Invalid Command\n\r"); break; }
-			// mode = 0, AA waveform
-			// mode = 1, LPF waveform
-			// mode = 2, DFF waveform
-			// mode = 3, TRG waveform
-			// mode = 4, Processed Data
-			//Detector->SetMode(mode);  // Set Mode for Detector
+			if (mode < 0 || mode > 4 ) { break; }	// mode = 0, AA waveform // mode = 1, LPF waveform	// mode = 2, DFF waveform	// mode = 3, TRG waveform	// mode = 4, Processed Data
 			Xil_Out32 (XPAR_AXI_GPIO_14_BASEADDR, ((u32)mode));
-			// Register 14
-			if ( mode == 0 ) { xil_printf("Transfer AA Waveforms\n\r"); }
-			if ( mode == 1 ) { xil_printf("Transfer LPF Waveforms\n\r"); }
-			if ( mode == 2 ) { xil_printf("Transfer DFF Waveforms\n\r"); }
-			if ( mode == 3 ) { xil_printf("Transfer TRG Waveforms\n\r"); }
-			if ( mode == 4 ) { xil_printf("Transfer Processed Data\n\r"); }
-			sleep(1); 			// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
 			break;
 
 		case 1: //Enable or disable the system
 			enable_state = 1;
-			if (enable_state != 0 && enable_state != 1) { xil_printf("Invalid Command\n\r"); break; }
+			if (enable_state != 0 && enable_state != 1) { break; }
 			Xil_Out32(XPAR_AXI_GPIO_18_BASEADDR, ((u32)enable_state));
-
-			if ( enable_state == 1 ) { xil_printf("DAQ Enabled\n\r"); }	// Register 18 Out enabled, In Disabled
-			if ( enable_state == 0 ) { xil_printf("DAQ Disabled\n\r"); }
-			sleep(1); 			// Built in Latency + 1 s
 			break;
 
 		case 2: //Continuously Read of Processed Data
-			i_SDReturn = f_open(&datafile, "usbtest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-			i_SDReturn = f_lseek(&datafile, file_size(&datafile));
+//			i_SDReturn = f_open(&datafile, "usbtest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+//			i_SDReturn = f_lseek(&datafile, file_size(&datafile));
 			ipollReturn = 0;
 			bytesSent = 0;
 			index = 0;
-			xil_printf("\r\ngo\r\n");
+			//xil_printf("\r\ngo\r\n");
 			while(ipollReturn != 113)
 			{
-				if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) == 32767)	//if the buffer is full, read it to SD
+				//testxilin = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);
+				if(1)//Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) == 32767)	//if the buffer is full, read it to SD
 				{
+					sleep(1);	//we don't have a gpio to check atm, so just sleep for a bit
 					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
 					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
-					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);		//and how much to transfer
+					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 49152);		//and how much to transfer	//can likely change 65536 -> 49152
 					usleep(54); 											// Built in Latency - 54 us
 					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);				//disable read out
 
@@ -229,23 +214,22 @@ int main()
 					usleep(1);								// Built in Latency - 1 us // 1 clock cycle-ish
 					Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
 
-					Xil_DCacheInvalidateRange(0x00000000, 65536);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer
+					Xil_DCacheInvalidateRange(0x00000000, 49152);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer //can likely change 65536 -> 49152
 
-					xil_printf("\r\ngetting data\r\n");
 					dram_addr = dram_base;
 					index = 0;
-					while(dram_addr <= dram_ceiling)	//will loop over 49152/4 addresses = 12288
+					while(dram_addr <=  dram_ceiling)	//will loop over 49152/4 addresses = 12288
 					{
 						testdata[index] = Xil_In32(dram_addr);	//grab the int from DRAM
 						index++;
 						dram_addr += 4;
 					}
 
-					xil_printf("\r\nsaving data\r\n");
 					//Save to SD card here
+					i_SDReturn = f_open(&datafile, "usbtest2.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 					i_SDReturn = f_lseek(&datafile, file_size(&datafile));
 					i_SDReturn = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
-					//i_SDReturn = f_sync(&datafile);
+					i_SDReturn = f_close(&datafile);
 					index = 0;
 				}
 
@@ -253,63 +237,31 @@ int main()
 
 				if(ipollReturn == 97)	//user sent an "a" and wants to transfer a file	//32 bytes?
 				{
-					xil_printf("\r\nfound an 'a'\r\n");
-					for(index = 0; index < LENGTH_DATA_ARRAY; index++)
+					while(index < LENGTH_DATA_ARRAY)
 					{
-						pu_testdatapieces[0+4*index] = testdata[index] >> 8 * 3;
-						pu_testdatapieces[1+4*index] = testdata[index] >> 8 * 2;
-						pu_testdatapieces[2+4*index] = testdata[index] >> 8 * 1;
-						pu_testdatapieces[3+4*index] = testdata[index] >> 8 * 0;
+						xil_printf("%d\n",testdata[index]);
+						index++;
 					}
-					while(1)
-					{
-						while(XUartPs_IsSending(&Uart_PS)){ }	//wait
-						bytesSent += XUartPs_Send(&Uart_PS, &(pu_testdatapieces[0]) + bytesSent, SIZEOF_DATA_ARRAY - bytesSent);\
-						if(bytesSent == SIZEOF_DATA_ARRAY)
-						{
-							bytesSent = 0;
-							ipollReturn = 0;
-							break;
-						}
-					}
+					bytesSent = 0;
+					ipollReturn = 0;
 				}
 			}
 
-			i_SDReturn = f_close(&datafile);
+//			i_SDReturn = f_close(&datafile);
 			sw = 0;   // broke out of the read loop, stop switch reset to 0
 			break;
 
 		case 3: //Set Threshold
-			xil_printf("\n\r Existing Threshold = %d \n\r",Xil_In32(XPAR_AXI_GPIO_10_BASEADDR));
-			xil_printf(" Enter Threshold (6144 to 10240) <return> \n\r");
-
 			ReadCommandPoll();
 			sscanf(RecvBuffer,"%04u",&thres);
-
 			Xil_Out32(XPAR_AXI_GPIO_10_BASEADDR, ((u32)thres));
-			xil_printf("New Threshold = %d \n\r",Xil_In32(XPAR_AXI_GPIO_10_BASEADDR));
-			sleep(1); 			// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
 			break;
 
-		case 4: //Set Integration Times
-			xil_printf("\n\r Existing Integration Times \n\r");
-			xil_printf(" Time = 0 ns is when the Pulse Crossed Threshold \n\r");
-			xil_printf(" Baseline Integral Window \t [-200ns,%dns] \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_0_BASEADDR))*4 );
-			xil_printf(" Short Integral Window \t [-200ns,%dns] \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_1_BASEADDR))*4 );
-			xil_printf(" Long Integral Window  \t [-200ns,%dns] \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_2_BASEADDR))*4 );
-			xil_printf(" Full Integral Window  \t [-200ns,%dns] \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_3_BASEADDR))*4 );
-
-			// Removed this section, if we are hitting this code, we want to change the values
-//			xil_printf(" Change: (Y)es (N)o <return>\n\r");
-/*			if (updateint == 'N' || updateint == 'n') { break; }
-			if (updateint == 'Y' || updateint == 'y') { SetIntegrationTimes(0); } */
+		case 4:
 			SetIntegrationTimes(0);	// 0 means we want to change the AA waveforms, 1 for LPF, 2 for DFF
-			sleep(1); 			// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
 			break;
 
-		case 5: //Perform a DMA transfer
-			xil_printf("\n\r Perform DMA Transfer of Waveform Data\n\r");
-			xil_printf(" Press 'q' to Exit Transfer  \n\r");
+		case 5:
 			Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);
 			Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);
 			sleep(1); 			// Built in Latency ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 1 s
@@ -317,40 +269,49 @@ int main()
 			sw = 0;   // broke out of the read loop, stop swith reset to 0
 			break;
 
-		case 6: //Perform a DMA transfer of Processed data
-			xil_printf("\n\r ********Perform DMA Transfer of Processed Data \n\r");
-			xil_printf(" Press 'q' to Exit Transfer  \n\r");
-			xil_printf("This functions does not do anything\r\n");
+		case 6:
 			break;
 
-		case 7: //Check the Size of the Data Buffers
-			databuff = Xil_In32 (XPAR_AXI_GPIO_11_BASEADDR);
-			xil_printf("\n\r BRAM Data Buffer Size = %d \n\r",databuff);
+		case 7:
 			break;
 
-		case 8: //Clear the processed data buffers
+		case 8: //Testing
 			while(1)
 			{
 				ipollReturn = PollUart(RecvBuffer, &Uart_PS);	//return value of 97, 113, or 0
 				if(ipollReturn == 97)	//user sent an "a" and wants to transfer a file	//32 bytes?
 				{
+					xil_printf("found an 'a'\r\n");
 					break;
 				}
-			}
-			bytesSent = 0;
-			iSprintfReturn = snprintf(pc_ReportBuff2, 100, "0123456789abcdefghijklmnopqrstuvwxyz9876543210zwxyvutsrqponmlkjihgfedcba");
-			XTime_GetTime(&tStart);
-			while(1)
-			{
-				XTime_GetTime(&tStart);
-				while(XUartPs_IsSending(&Uart_PS)){ i++;}	//wait
-				XTime_GetTime(&tEnd);
+				Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
+				Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
+				Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 49152);		//and how much to transfer	//can likely change 65536 -> 49152
+				usleep(54); 											// Built in Latency - 54 us
+				Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);				//disable read out
+				//testxilin = Xil_In32(XPAR_AXI_GPIO_13_BASEADDR);
+				testxilin = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);//0x41230000 //peripheral definition
+				//xil_printf("%d\r\n",testxilin);
+				testxilin = Xil_In32(0x412B0000);//canonical definition of gpio_2 listed as gpio_11
+				//xil_printf("%d\r\n",testxilin);
+				testxilin = Xil_In32(0x41230000);//0x41230000
+				//xil_printf("%d\r\n",testxilin);
 
-				bytesSent += XUartPs_Send(&Uart_PS, pc_ReportBuff2 + bytesSent, iSprintfReturn - bytesSent);
-				if(bytesSent == iSprintfReturn)
-					break;
 			}
-			printf("\r\nOne wait took: %.2f us with i=%d\r\n", 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000),i);
+//			bytesSent = 0;
+//			iSprintfReturn = snprintf(pc_ReportBuff2, 100, "0123456789abcdefghijklmnopqrstuvwxyz9876543210zwxyvutsrqponmlkjihgfedcba");
+//			XTime_GetTime(&tStart);
+//			while(1)
+//			{
+//				XTime_GetTime(&tStart);
+//				while(XUartPs_IsSending(&Uart_PS)){ i++;}	//wait
+//				XTime_GetTime(&tEnd);
+//
+//				bytesSent += XUartPs_Send(&Uart_PS, pc_ReportBuff2 + bytesSent, iSprintfReturn - bytesSent);
+//				if(bytesSent == iSprintfReturn)
+//					break;
+//			}
+//			printf("\r\nOne wait took: %.2f us with i=%d\r\n", 1.0 * (tEnd - tStart) / (COUNTS_PER_SECOND/1000000),i);
 			break;
 		case 9: //Print DMA Data
 			xil_printf("\n\r Test DAQ\n\r");
@@ -481,25 +442,17 @@ void SetIntegrationTimes(u8 wfid){
 	switch (wfid) { // Switch-Case for performing set integrals
 
 			case 0: //AA Integrals
-				xil_printf("  Enter Baseline Stop Time in ns: -52 to 0 <return> \t");
 				ReadCommandPoll();
 				sscanf(RecvBuffer,"%d",&integrals[0]);
-				xil_printf("\n\r");
 
-				xil_printf("  Enter Short Integral Stop Time in ns: -52 to 8000 <return> \t");
 				ReadCommandPoll();
 				sscanf(RecvBuffer,"%d",&integrals[1]);
-				xil_printf("\n\r");
 
-				xil_printf("  Enter Long Integral Stop Time in ns: -52 to 8000 <return> \t");
 				ReadCommandPoll();
 				sscanf(RecvBuffer,"%d",&integrals[2]);
-				xil_printf("\n\r");
 
-				xil_printf("  Enter Full Integral Stop Time in ns: -52 to 8000 <return> \t");
 				ReadCommandPoll();
 				sscanf(RecvBuffer,"%d",&integrals[3]);
-				xil_printf("\n\r");
 
 				setsamples[0] = ((u32)((integrals[0]+52)/4));
 				setsamples[1] = ((u32)((integrals[1]+52)/4));
@@ -510,15 +463,7 @@ void SetIntegrationTimes(u8 wfid){
 				Xil_Out32 (XPAR_AXI_GPIO_1_BASEADDR, setsamples[1]);
 				Xil_Out32 (XPAR_AXI_GPIO_2_BASEADDR, setsamples[2]);
 				Xil_Out32 (XPAR_AXI_GPIO_3_BASEADDR, setsamples[3]);
-
-				xil_printf("\n\r  Inputs Rounded to the Nearest 4 ns : Number of Samples\n\r");
-				xil_printf("  Baseline Integral Window  [-200ns,%dns]: %d \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_0_BASEADDR))*4, 38+Xil_In32(XPAR_AXI_GPIO_0_BASEADDR) );
-				xil_printf("  Short Integral Window 	  [-200ns,%dns]: %d \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_1_BASEADDR))*4, 38+Xil_In32(XPAR_AXI_GPIO_1_BASEADDR));
-				xil_printf("  Long Integral Window      [-200ns,%dns]: %d \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_2_BASEADDR))*4, 38+Xil_In32(XPAR_AXI_GPIO_2_BASEADDR));
-				xil_printf("  Full Integral Window      [-200ns,%dns]: %d \n\r",-52 + ((int)Xil_In32(XPAR_AXI_GPIO_3_BASEADDR))*4, 38+Xil_In32(XPAR_AXI_GPIO_3_BASEADDR));
-
 				break;
-
 			case 1://DFF Integrals
 				xil_printf("Enter Baseline Stop Time in ns: -32 to 0 <return> \t");
 				ReadCommandPoll();
@@ -541,7 +486,6 @@ void SetIntegrationTimes(u8 wfid){
 				xil_printf("Integral Window 	      [0ns,%dns]: %d \n\r",((int)Xil_In32(XPAR_AXI_GPIO_8_BASEADDR))*4, 1+Xil_In32(XPAR_AXI_GPIO_8_BASEADDR));
 
 				break;
-
 			case 2://LPF Integrals
 				xil_printf("Enter Baseline Stop Time in ns: -60 to 0 <return> \t");
 				ReadCommandPoll();
@@ -572,7 +516,6 @@ void SetIntegrationTimes(u8 wfid){
 				xil_printf("Full Integral Window 	  [0ns,%dns]: %d \n\r",((int)Xil_In32(XPAR_AXI_GPIO_6_BASEADDR))*4, 1+Xil_In32(XPAR_AXI_GPIO_6_BASEADDR));
 
 				break;
-
 			default:
 				break;
 	}
@@ -597,18 +540,7 @@ int PrintData( ){
 
 	//Save to SD card here
 	ffres = f_open(&datafile, "usbtest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-	if(ffres != FR_OK) {
-		xil_printf("1 %d\r\n",ffres);
-		return 1;
-	}
-
 	ffres = f_lseek(&datafile, file_size(&datafile));
-	if(ffres != FR_OK) {
-		xil_printf("2 %d\r\n",ffres);
-		return 1;
-	}
-	xil_printf("\r\n%d\r\n",file_size(&datafile));
-
 	dram_addr = dram_base;
 	while(dram_addr <= dram_ceiling)	//will loop over 49152/4 addresses = 12288
 	{
@@ -618,31 +550,13 @@ int PrintData( ){
 		if(index == 4096)						//if the array is full
 		{
 			ffres = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
-			if(ffres != FR_OK) {
-				xil_printf("3 %d\r\n",ffres);
-				return 1;
-			}
-			index = 0;														//reuse the array that we have been using
+			index = 0;																	//reuse the array that we have been using
 		}
 	}
-
 	ffres = f_close(&datafile);	//close the file
-	if(ffres != FR_OK) {
-		xil_printf("4 %d\r\n",ffres);
-		return 1;
-	}
 	return sw;
 }
 //////////////////////////// PrintData ////////////////////////////////
-
-
-//////////////////////////// Clear Processed Data Buffers ////////////////////////////////
-//void ClearBuffers() {
-//	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,1);
-//	usleep(1);						// Built in Latency - 1 us // 1 clock cycle-ish
-//	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
-//}
-//////////////////////////// Clear Processed Data Buffers ////////////////////////////////
 
 //////////////////////////// DAQ ////////////////////////////////
 int DAQ(){
@@ -661,4 +575,3 @@ int DAQ(){
 	return sw;
 }
 //////////////////////////// DAQ ////////////////////////////////
-

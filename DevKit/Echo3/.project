@@ -3,6 +3,7 @@
 	<name>Echo3</name>
 	<comment></comment>
 	<projects>
+		<project>standalone_bsp_2</project>
 		<project>standalone_bsp_1</project>
 		<project>standalone_bsp_0</project>
 	</projects>
