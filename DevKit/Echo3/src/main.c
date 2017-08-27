@@ -194,43 +194,49 @@ int main()
 		case 2: //Continuously Read of Processed Data
 //			i_SDReturn = f_open(&datafile, "usbtest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 //			i_SDReturn = f_lseek(&datafile, file_size(&datafile));
+
+			mode = 4;
+			Xil_Out32 (XPAR_AXI_GPIO_14_BASEADDR, ((u32)mode));
+			enable_state = 1;
+			Xil_Out32 (XPAR_AXI_GPIO_18_BASEADDR, ((u32)enable_state));
+
 			ipollReturn = 0;
 			bytesSent = 0;
 			index = 0;
-			//xil_printf("\r\ngo\r\n");
-			while(ipollReturn != 113)
+
+			while(ipollReturn != 113)	//loop until gettting a 'q' in the RecvBuffer
 			{
-				//testxilin = Xil_In32(XPAR_AXI_GPIO_11_BASEADDR);
-				if(1)//Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) == 32767)	//if the buffer is full, read it to SD
+				if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) > 0)	//if the buffer is full, read it to SD
 				{
-					sleep(1);	//we don't have a gpio to check atm, so just sleep for a bit
-					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
-					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
-					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 49152);		//and how much to transfer	//can likely change 65536 -> 49152
-					usleep(54); 											// Built in Latency - 54 us
-					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);				//disable read out
-
-					Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,1);	//Clear the buffers //Reset the read address
-					usleep(1);								// Built in Latency - 1 us // 1 clock cycle-ish
-					Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
-
-					Xil_DCacheInvalidateRange(0x00000000, 49152);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer //can likely change 65536 -> 49152
-
-					dram_addr = dram_base;
-					index = 0;
-					while(dram_addr <=  dram_ceiling)	//will loop over 49152/4 addresses = 12288
-					{
-						testdata[index] = Xil_In32(dram_addr);	//grab the int from DRAM
-						index++;
-						dram_addr += 4;
-					}
-
-					//Save to SD card here
-					i_SDReturn = f_open(&datafile, "usbtest2.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-					i_SDReturn = f_lseek(&datafile, file_size(&datafile));
-					i_SDReturn = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
-					i_SDReturn = f_close(&datafile);
-					index = 0;
+//					sleep(2);	//we don't have a gpio to check atm, so just sleep for a bit
+//					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
+//					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
+//					Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 49152);		//and how much to transfer	//can likely change 65536 -> 49152
+//					usleep(54); 											// Built in Latency - 54 us
+//					Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);				//disable read out
+//
+//					Xil_DCacheInvalidateRange(0x00000000, 49152);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer //can likely change 65536 -> 49152
+//
+//					dram_addr = dram_base;
+//					index = 0;
+//					while(dram_addr <=  dram_ceiling)	//will loop over 49152/4 addresses = 12288
+//					{
+//						testdata[index] = Xil_In32(dram_addr);	//grab the int from DRAM
+//						index++;
+//						dram_addr += 4;
+//					}
+//
+//					Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,1);	//Clear the buffers //Reset the read address
+//					usleep(50);								// Built in Latency - 1 us // 1 clock cycle-ish
+//					Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
+//
+//					//Save to SD card here
+//					i_SDReturn = f_open(&datafile, "usbtest2.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+//					i_SDReturn = f_lseek(&datafile, file_size(&datafile));
+//					i_SDReturn = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
+//					i_SDReturn = f_close(&datafile);
+//					index = 0;
+					DAQ();
 				}
 
 				ipollReturn = PollUart(RecvBuffer, &Uart_PS);	//return value of 97, 113, or 0
@@ -245,6 +251,8 @@ int main()
 					bytesSent = 0;
 					ipollReturn = 0;
 				}
+
+				memset(testdata, '\0', 12288);
 			}
 
 //			i_SDReturn = f_close(&datafile);
@@ -539,17 +547,18 @@ int PrintData( ){
 	Xil_DCacheInvalidateRange(0x00000000, 65536);	//make sure the PS doesn't corrupt the memory  by accessing while doing DMA transfer
 
 	//Save to SD card here
-	ffres = f_open(&datafile, "usbtest.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	ffres = f_open(&datafile, "t003.bin", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 	ffres = f_lseek(&datafile, file_size(&datafile));
 	dram_addr = dram_base;
 	while(dram_addr <= dram_ceiling)	//will loop over 49152/4 addresses = 12288
 	{
 		testdata[index] = Xil_In32(dram_addr);	//grab the int from DRAM
+//		xil_printf("%d\n",testdata[index]);
 		index++;
 		dram_addr += 4;
 		if(index == 4096)						//if the array is full
 		{
-			ffres = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY, &numBytesWritten);	//write the data
+			ffres = f_write(&datafile, testdata, SIZEOF_DATA_ARRAY/3, &numBytesWritten);	//write the data
 			index = 0;																	//reuse the array that we have been using
 		}
 	}

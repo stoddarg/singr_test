@@ -102,6 +102,10 @@ namespace lunaHMaptestbed {
 	private: bool psdCap_run;
 	private: array<int>^ g_dataBuffer;
 	private: array<unsigned char>^ g_binaryDataBuffer;
+	private: ref struct dataForBkgdWorker {
+		String^ mstrFileName;
+		String^ portName;
+	};
 	private: System::Windows::Forms::MenuStrip^  menuStrip1;
 	private: System::Windows::Forms::ToolStripMenuItem^  fileToolStripMenuItem;
 	private: System::Windows::Forms::ToolStripMenuItem^  restartToolStripMenuItem;
@@ -691,6 +695,8 @@ private: System::Windows::Forms::Timer^  timer1;
 			// chk_atf
 			// 
 			this->chk_atf->AutoSize = true;
+			this->chk_atf->Checked = true;
+			this->chk_atf->CheckState = System::Windows::Forms::CheckState::Checked;
 			this->chk_atf->Location = System::Drawing::Point(1087, 613);
 			this->chk_atf->Name = L"chk_atf";
 			this->chk_atf->Size = System::Drawing::Size(94, 17);
@@ -915,35 +921,6 @@ private: System::Void b_SetThreshold_Click(System::Object^  sender, System::Even
 private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventArgs^  e) {
 
 	////background worker stuff!
-	//psdCap_run = !psdCap_run;		//init'd as false
-	//if (psdCap_run)
-	//{
-	//	this->b_capturePSD->Text = "Stop Capture";
-	//}
-	//if (!psdCap_run)	//stop capturing data
-	//{
-	//	this->b_capturePSD->Text = "Capture PSD";
-	//	this->tb_updates->Text = "Stop button pressed.";
-	//	return;	//returns out of this function call to the still running call of this function
-	//}
-	//if (psdCap_run && (chk_atf->Checked || chk_stf->Checked))	//if we are running and one of the check buttons is checked, get the file name to pass
-	//{
-	//	if (this->tb_savefilename->Text == String::Empty)		//if checked, but no file name, return
-	//	{
-	//		this->tb_updates->Text = "Please choose a file save or append location.";
-	//		this->b_capturePSD->Text = "Capture PSD";
-	//		psdCap_run = !psdCap_run;
-	//		return;
-	//	}
-
-	//	/* Get the filename */
-	//	String^ s_fileName = this->saveFileDialog1->FileName;
-	//}
-	
-
-
-
-	/* This button will send commands to open a serial connection and get processed data */
 	psdCap_run = !psdCap_run;		//init'd as false
 	if (psdCap_run)
 	{
@@ -952,16 +929,23 @@ private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventA
 	if (!psdCap_run)	//stop capturing data
 	{
 		this->b_capturePSD->Text = "Capture PSD";
-		this->tb_updates->Text = "Stop button pressed.";
+		this->tb_updates->Text = "Stop button pressed; background worker cancelled.";
+		backgroundWorker1->CancelAsync();
 		return;	//returns out of this function call to the still running call of this function
 	}
+	String^ s_fileName;
+	dataForBkgdWorker^ s_variables = gcnew dataForBkgdWorker;	//lets you name the fileName and portName
 
-	/* create an output file stream object */
-	std::ofstream outputFile;
-
-	if (psdCap_run && (chk_atf->Checked || chk_stf->Checked))	//if we are running and one of the check buttons is checked, open the save file
+	if (this->comboBox1->Text == String::Empty) {
+		this->tb_updates->Text = "Select a port above.";
+		return;
+	}
+	else
+		s_variables->portName = this->comboBox1->Text;
+	
+	if (psdCap_run && (chk_atf->Checked || chk_stf->Checked))	//if we are running and one of the check buttons is checked, get the file name to pass
 	{
-		if (this->tb_savefilename->Text == String::Empty)
+		if (this->tb_savefilename->Text == String::Empty)		//if checked, but no file name, return
 		{
 			this->tb_updates->Text = "Please choose a file save or append location.";
 			this->b_capturePSD->Text = "Capture PSD";
@@ -970,72 +954,31 @@ private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventA
 		}
 
 		/* Get the filename */
-		std::string str_fileName;
-		String^ s_fileName = this->saveFileDialog1->FileName;
-		str_fileName = msclr::interop::marshal_as<std::string>(s_fileName);
-
-		/* open the file */
-		outputFile.open(str_fileName, std::ios::app);
-
-		if (!outputFile)	//if we can't open the file
-		{
-			this->tb_updates->Text = "Could not access the specified file.";
-			this->b_capturePSD->Text = "Capture PSD";
-			psdCap_run = !psdCap_run;
-			return;
-		}
+		s_variables->mstrFileName = this->saveFileDialog1->FileName;
 	}
 
-	/* Declare variables */
-	int iBaselineValue{ 0 };
-	int iShortIntValue{ 0 };
-	int iLongIntValue{ 0 };
-	int iFullIntValue{ 0 };
-	int num_bl_samples{ 0 };
-	int num_si_samples{ 0 };
-	int num_li_samples{ 0 };
-	int num_fi_samples{ 0 };
-	double bl1{ 0 };
-	double bl2{ 0 };
-	double bl3{ 0 };
-	double bl4{ 0 };
-	int ID{ 0 };
-	double bl_avg{ 0.0 };
-	double baseline_int{ 0.0 };
-	double short_int{ 0.0 };
-	double long_int{ 0.0 };
-	double full_int{ 0.0 };
-	double psd{ 0.0 };
-	double energy{ 0.0 };
-	EventData eventStruct{};
+	//set up the charts here
+	/* Determine domain and range for the FOM, Energy Spectrum charts here */ //just declaring the variable here doesn't work for other functions
+																			  /* Determine the domain and set axes for the spectrum graph */
+	double dPSDXmin = 0.0;
+	double dPSDXmax = 0.0;
+	double dSpectrumDomain = 0.0;
+	double dPSDYmin = 0.0;
+	double dPSDYmax = 0.0;
+	double dFOMRange = 0.0;
+	int iNumberSpectrumBins = 1000.0;
+	int iFOMBins = 100.0;
+	double dSpectrumBinSize = 0.0;
+	double dFOMBinSize = 0.0;
 
-	double dPSDXmin{ 0 };
-	double dPSDXmax{ 0 };
-	int iSpectrumArray[1000]{};
-	double dSpectrumDomain{ 0.0 };
-	double dBinSize{ 0.0 };
-	int iSpectrumArrayIndex{ 0 };
-	double dSpectrumBin{ 0.0 };
-	int missedEvents{ 0 };
-
-	double dPSDYmin{ 0.0 };
-	double dPSDYmax{ 0.0 };
-	double dFOMRange{ 0.0 };
-	double dFOMBinSize{ 0.0 };
-	double dFOMBinNumber{ 0.0 };
-	int iFOMBins{ 100 };
-	int * iFOMArray = new int[iFOMBins]{};	//need to work on how to be able to change this (probably should use std::vector)
-	int iFOMArrayIndex{ 0 };
-
-	/* Determine the domain and set axes for the spectrum graph */
-	dPSDXmin = this->ch_PSD->ChartAreas[0]->AxisX->Minimum;
+	dPSDXmin = this->ch_PSD->ChartAreas[0]->AxisX->Minimum;			//get the min and max of the PSD chart
 	dPSDXmax = this->ch_PSD->ChartAreas[0]->AxisX->Maximum;
-	this->ch_Spectrum->ChartAreas[0]->AxisX->Minimum = dPSDXmin;
+	this->ch_Spectrum->ChartAreas[0]->AxisX->Minimum = dPSDXmin;	//set the min and max of the spectrum chart to match
 	this->ch_Spectrum->ChartAreas[0]->AxisX->Maximum = dPSDXmax;
-	dSpectrumDomain = dPSDXmax - dPSDXmin;
-	dBinSize = dSpectrumDomain / 1000.0;
+	dSpectrumDomain = dPSDXmax - dPSDXmin;							//determine that domain of values
+	dSpectrumBinSize = dSpectrumDomain / iNumberSpectrumBins;					//set the bin size accordingly //currently 1000 bins
 
-	/* Determine the range, set axes, and calculate the bin size for the FOM graph */
+																				/* Determine the range, set axes, and calculate the bin size for the FOM graph */
 	dPSDYmin = this->ch_PSD->ChartAreas[0]->AxisY->Minimum;
 	dPSDYmax = this->ch_PSD->ChartAreas[0]->AxisY->Maximum;
 	this->ch_FOM->ChartAreas[0]->AxisX->Minimum = dPSDYmin;
@@ -1043,115 +986,9 @@ private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventA
 	dFOMRange = dPSDYmax - dPSDYmin;
 	dFOMBinSize = dFOMRange / iFOMBins;
 
-	/* Open the serial port */
-	if (this->comboBox1->Text == String::Empty) 
-	{
-		this->tb_updates->Text = "Select a port above.";
-		this->b_capturePSD->Text = "Capture PSD";
-		psdCap_run = !psdCap_run;
-		return;
-	}
-	else 
-	{
-		if (!this->serialPort1->IsOpen) {	//if the port isn't open, open it 
-			this->serialPort1->PortName = this->comboBox1->Text;
-			this->serialPort1->Open();			
-		}
-		else {	//if the port is open, just post that and continue using it
-			this->tb_updates->Text = "Connected using port " + this->serialPort1->PortName;
-		}
-	}
+	//if the check boxes weren't checked, send no filename; always send a port name
+	backgroundWorker1->RunWorkerAsync(s_variables);
 
-	/* get the number of samples based on what is in the textboxes, or the default */
-	/* if nothing is entered in the integration times textboxes, put the default values there */
-	if (this->tb_baseline->Text == String::Empty)
-	{
-		num_bl_samples = ((200 - 8) / 4) + 1;		// default is -8, gives 49 samples
-		num_si_samples = ((200 + 232) / 4) + 1;		// default is 232, gives 109
-		num_li_samples = ((200 + 616) / 4) + 1;		// default is 616, gives 205
-		num_fi_samples = ((200 + 8008) / 4) + 1;	// default is 8008, gives 2053
-
-		this->tb_baseline->Text = (num_bl_samples * 4) - 52 + " ";	//fill in the empty textboxes with the following values
-		this->tb_short->Text = (num_si_samples * 4) - 52 + " ";
-		this->tb_long->Text = (num_li_samples * 4) - 52 + " ";
-		this->tb_full->Text = (num_fi_samples * 4) - 52 + " ";
-	}
-	else	// if the user entered their own values, find the number of samples for those values
-	{
-		Int32::TryParse(this->tb_baseline->Text, iBaselineValue);
-		Int32::TryParse(this->tb_short->Text, iShortIntValue);
-		Int32::TryParse(this->tb_long->Text, iLongIntValue);
-		Int32::TryParse(this->tb_full->Text, iFullIntValue);
-		num_bl_samples = ((200 + iBaselineValue) / 4) + 1;
-		num_si_samples = ((200 + iShortIntValue) / 4) + 1;
-		num_li_samples = ((200 + iLongIntValue) / 4) + 1;
-		num_fi_samples = ((200 + iFullIntValue) / 4) + 1;
-	}
-
-	/* Now we may send commands over the serial port */
-	if (this->serialPort1->IsOpen)	//double check that the port is open
-	{
-		this->serialPort1->WriteLine("0");
-		Sleep(500);
-		this->serialPort1->WriteLine("4");
-		Sleep(500);
-		this->serialPort1->WriteLine("1");
-		Sleep(500);
-
-		this->serialPort1->WriteLine("2");
-		this->tb_updates->Text = "Collecting...";
-		//Sleep(5000);	//wait 5 seconds before sending a message asking for data from the uZ
-	}
-	else
-	{
-		this->tb_updates->Text = "Port is not open.";
-		this->b_capturePSD->Text = "Capture PSD";
-		psdCap_run = !psdCap_run;
-		return;
-	}
-	
-	/* Capture incoming data; process and plot it */
-	int index{ 0 };
-	int buffsize{ 0 };
-	int numBuffers{ 0 };
-	int bytesRead{ 0 };
-	int offset{ 0 };
-	int dataBuffer[100]{};
-	String^ amessage = "";
-	g_dataBuffer = gcnew array<int>(DATABUFFER_SIZE) {};
-	g_binaryDataBuffer = gcnew array<unsigned char>(BINARY_DATABUFFER_SIZE) {};
-
-/*	Int32::TryParse(this->serialPort1->ReadLine(), buffsize); */	//get the buffer size 
-	while (psdCap_run)	//replace numBuffers with psdCap_run
-	{
-		Sleep(2000);	//ask for data every 10s 
-		this->serialPort1->WriteLine("a\r");
-		//amessage = this->serialPort1->ReadLine();	//wait for the uZ to sort the array//this will block until we receive the message
-
-		while (index < DATABUFFER_SIZE)	//read the entire thing into our u8 buffer so we may sort it back into integers and save it
-		{
-			//bytesRead += this->serialPort1->Read(g_binaryDataBuffer, offset + bytesRead, this->serialPort1->BytesToRead);
-			Int32::TryParse(this->serialPort1->ReadLine(), g_dataBuffer[index]);	//parse in the line that we are reading 
-			outputFile << std::setw(11) << g_dataBuffer[index] << std::endl;
-			index++;
-		}
-		index = 0;
-		Application::DoEvents();
-	}
-	
-	this->serialPort1->DiscardInBuffer();
-	if (outputFile.is_open())
-	{
-		outputFile.close();
-	}
-	outputFile.close();
-	delete[] iFOMArray;
-
-	this->serialPort1->WriteLine("q\r");
-	Sleep(500);
-
-	this->tb_updates->Text = "Capture finished. Chart not erased.";
-	this->tb_updates->Text = amessage;
 	return;
 }//eoCapturePSDclick
 
@@ -1410,14 +1247,132 @@ private: System::Void addFOMCutsToolStripMenuItem_Click(System::Object^  sender,
 private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::ComponentModel::DoWorkEventArgs^  e) 
 {
 	//do work
+	BackgroundWorker^ worker = dynamic_cast<BackgroundWorker^>(sender);
+
+	std::string str_fileName;
+	std::string str_portName;
+	std::ofstream outputFile;
+
+	String^ filename = safe_cast<dataForBkgdWorker^>(e->Argument)->mstrFileName;
+	str_fileName = msclr::interop::marshal_as<std::string>(filename);
+	outputFile.open(str_fileName, std::ios::app);
+	
+	if (!outputFile)	//if we can't open the file
+	{
+		//send a message to report progress
+		worker->ReportProgress(-1);
+	}
+
+	//start serial connection and try and send/receive bytes
+	if (!serialPort1->IsOpen) {
+		String^ portname = safe_cast<dataForBkgdWorker^>(e->Argument)->portName;
+		serialPort1->PortName = portname;
+		serialPort1->Open();
+	}
+	else
+		worker->ReportProgress(-11);	//tell the user that the port is open
+
+	//Write to the port
+	if (serialPort1->IsOpen)	//if we are using the box & bitsream w/old SDK code, need to put 0->4, 1, before sending a 2
+	{
+		serialPort1->WriteLine("2");
+		Sleep(500);
+		worker->ReportProgress(-12);	//tell the user we have connected
+	}
+
+	/* Capture incoming data; process and plot it */
+	int index{ 0 };
+	int buffsize{ 0 };
+	int numBuffers{ 0 };
+	int bytesRead{ 0 };
+	int offset{ 0 };
+	int dataBuffer[100]{};
+	String^ amessage = "";
+	g_dataBuffer = gcnew array<int>(DATABUFFER_SIZE) {};
+
+	while (worker->CancellationPending == false)
+	{
+		Sleep(2000);	//ask for data every few seconds, depending on how fast reading back is 
+		this->serialPort1->WriteLine("a\r");
+		//amessage = this->serialPort1->ReadLine();	//wait for the uZ to sort the array//this will block until we receive the message
+
+		while (index < DATABUFFER_SIZE)	//read the entire thing into our u8 buffer so we may sort it back into integers and save it
+		{
+			Int32::TryParse(this->serialPort1->ReadLine(), g_dataBuffer[index]);	//parse in the line that we are reading 
+			outputFile << g_dataBuffer[index] << std::endl;		//save it to a file in a column
+			index++;
+		}
+
+		worker->ReportProgress(414141, g_dataBuffer);
+		index = 0;
+	}
+
+	this->serialPort1->WriteLine("q\r");
+	Sleep(1000);
+
+	outputFile.close();
+	serialPort1->Close();
+	worker->ReportProgress(-19);
 }
 private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender, System::ComponentModel::ProgressChangedEventArgs^  e) 
 {
 	//update the main thread
+	if (e->ProgressPercentage == -1)
+	{
+		this->tb_updates->Text = "Error.";
+		return;
+	}
+	else if (e->ProgressPercentage == -11)
+	{
+		this->tb_updates->Text = "Connected to the serial port.";
+		return;
+	}
+	else if (e->ProgressPercentage == -12)
+	{
+		this->tb_updates->Text = "Data acquisition started.";
+		return;
+	}
+	else if (e->ProgressPercentage == -19)
+	{
+		this->tb_updates->Text = "Data acquisition stopped.";
+		return;
+	}
+	else if (e->ProgressPercentage == 414141)	//the only elseif where we stay in this function to parse out data and print to the charts
+		this->tb_updates->Text = "Buffer received and saved.";
+
+	//Variables for processing
+	int index(0);
+	double bl1(0);	double bl2(0); double bl3(0); double bl4(0); double bl_avg(0);
+	double si(0); double li(0); double fi(0);
+	double psd(0);
+	double energy(0);
+
+	array<int>^ dataBufferPassed = safe_cast<array<int>^>(e->UserState);	//this will be an array[12288]
+
+	while (index < DATABUFFER_SIZE)
+	{
+		switch (dataBufferPassed[index])
+		{
+		case 111111:
+			//process the AA integrator data
+			if ((psd > (this->ch_PSD->ChartAreas[0]->AxisX->Minimum) && psd < (this->ch_PSD->ChartAreas[0]->AxisX->Maximum)) 
+				&& (energy > (this->ch_PSD->ChartAreas[0]->AxisY->Minimum) && energy < (this->ch_PSD->ChartAreas[0]->AxisY->Maximum)))
+				this->ch_PSD->Series["Series1"]->Points->AddXY(fi, psd);
+			index += 8;
+			break;
+		case 121212:
+
+		}
+	}
+
 }
 private: System::Void backgroundWorker1_RunWorkerCompleted(System::Object^  sender, System::ComponentModel::RunWorkerCompletedEventArgs^  e) 
 {
 	//what to do on cancel or completion
+	if (e->Cancelled)
+		this->tb_updates->Text = "Worker cancel success.";
+	else if (e->Error != nullptr)
+		MessageBox::Show(e->Error->Message);
 }
 private: System::Void backgroundWorker2_DoWork(System::Object^  sender, System::ComponentModel::DoWorkEventArgs^  e) 
 {

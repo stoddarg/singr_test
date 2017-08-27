@@ -1,3 +1,6 @@
 ﻿  MyForm.cpp
+c:\users\gstoddard\desktop\singr_test\singr-master\luna-singr_fusion_gui\gui\lunahmaptestbed\MyForm.h(969): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+c:\users\gstoddard\desktop\singr_test\singr-master\luna-singr_fusion_gui\gui\lunahmaptestbed\MyForm.h(970): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+c:\users\gstoddard\desktop\singr_test\singr-master\luna-singr_fusion_gui\gui\lunahmaptestbed\MyForm.h(936): warning C4101: 's_fileName': unreferenced local variable
   lunaHMaptestbed.vcxproj -> C:\Users\GStoddard\Desktop\SINGR_TEST\SINGR-master\luna-singr_fusion_gui\GUI\Debug\lunaHMaptestbed.exe
   lunaHMaptestbed.vcxproj -> C:\Users\GStoddard\Desktop\SINGR_TEST\SINGR-master\luna-singr_fusion_gui\GUI\Debug\lunaHMaptestbed.pdb (Full PDB)
