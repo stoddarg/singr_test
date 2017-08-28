@@ -1253,7 +1253,7 @@ private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::
 	std::string str_fileName;
 	std::string str_portName;
 	std::ofstream outputFile;
-
+	String^ portname = safe_cast<dataForBkgdWorker^>(e->Argument)->portName;
 	String^ filename = safe_cast<dataForBkgdWorker^>(e->Argument)->mstrFileName;
 	str_fileName = msclr::interop::marshal_as<std::string>(filename);
 	outputFile.open(str_fileName, std::ios::app);
@@ -1266,7 +1266,6 @@ private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::
 
 	//start serial connection and try and send/receive bytes
 	if (!serialPort1->IsOpen) {
-		String^ portname = safe_cast<dataForBkgdWorker^>(e->Argument)->portName;
 		serialPort1->PortName = portname;
 		serialPort1->Open();
 	}
@@ -1293,10 +1292,22 @@ private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::
 
 	while (worker->CancellationPending == false)
 	{
-		Sleep(2000);	//ask for data every few seconds, depending on how fast reading back is 
-		this->serialPort1->WriteLine("a\r");
-		//amessage = this->serialPort1->ReadLine();	//wait for the uZ to sort the array//this will block until we receive the message
-
+		Sleep(10000);	//ask for data every few seconds, depending on how fast reading back is 
+		if (serialPort1->IsOpen)
+		{
+			serialPort1->WriteLine("a\r");
+			Sleep(500);
+			worker->ReportProgress(-13);
+		}
+		else
+		{
+			serialPort1->PortName = portname;
+			serialPort1->Open();
+			serialPort1->WriteLine("a\r");
+			Sleep(500);
+			worker->ReportProgress(-13);
+		}
+		
 		while (index < DATABUFFER_SIZE)	//read the entire thing into our u8 buffer so we may sort it back into integers and save it
 		{
 			UInt32::TryParse(this->serialPort1->ReadLine(), g_dataBuffer[index]);	//parse in the line that we are reading 
@@ -1331,6 +1342,11 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 	else if (e->ProgressPercentage == -12)
 	{
 		this->tb_updates->Text = "Data acquisition started.";
+		return;
+	}
+	else if (e->ProgressPercentage == -13)
+	{
+		this->tb_updates->Text = "Requesting Data.";
 		return;
 	}
 	else if (e->ProgressPercentage == -19)
@@ -1373,6 +1389,7 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 			eventsSorted[eventIndex].aaFullInt = dataBufferPassed[index + 6];
 			eventsSorted[eventIndex].aaEight = dataBufferPassed[index + 7];
 			index += 8;
+			eventIndex++;	//move to the next event in the struct
 			break;
 		case 121212:
 			//process the LPF data
@@ -1384,6 +1401,7 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 			eventsSorted[eventIndex].lpfSeven = dataBufferPassed[index + 6];
 			eventsSorted[eventIndex].lpfEight = dataBufferPassed[index + 7];
 			index += 8;
+			eventIndex++;
 			break;
 		case 131313:
 			//process the LPF data
@@ -1394,20 +1412,24 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 			eventsSorted[eventIndex].dffShortInt = dataBufferPassed[index + 5];
 			eventsSorted[eventIndex].dffSeven = dataBufferPassed[index + 6];
 			eventsSorted[eventIndex].dffEight = dataBufferPassed[index + 7];
+			index += 8;
+			eventIndex++;
 			break;
 		default:
 			//if we hit this, we didn't find an identifier or the array is finished
 			index++;	//check the next entry
 			break;
 		}
-		eventIndex++;			//move to the next event in the struct
+		
 		if (eventIndex > 511)	//if we are at the bottom, reset for the next parts of the struct
 		{
-			index++;
+			//index++;
 			eventIndex = 0;
 		}
+		if (index > 12280)	//if we are near the top, in the last event, jump out (it's garbage)
+			break;
 	}
-
+	this->tb_updates->Text = "Data sorted.";
 	//Now that data is sorted, sift through and plot it
 	array<double>^ aablavgArray = gcnew array<double>(512);
 	double bl1(0);	double bl2(0); double bl3(0); double bl4(0); double bl_avg(0);
@@ -1434,19 +1456,18 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 			bl_avg = (bl4 + bl3 + bl2 + bl1) / 4.0;
 		aablavgArray[eventIndex] = bl_avg;
 		si = eventsSorted[eventIndex].aaShortInt / 16.0 - (bl_avg * 73.0);
-		si = eventsSorted[eventIndex].aaLongInt / 16.0 - (bl_avg * 169.0);
-		si = eventsSorted[eventIndex].aaFullInt / 16.0 - (bl_avg * 1551.0);
+		li = eventsSorted[eventIndex].aaLongInt / 16.0 - (bl_avg * 169.0);
+		fi = eventsSorted[eventIndex].aaFullInt / 16.0 - (bl_avg * 1551.0);
 		psd = si / (li - si);
 		energy = 1.0 * fi + 0.0;
 
 		//plot code for PSD
-		if ((psd > (this->ch_PSD->ChartAreas[0]->AxisX->Minimum) && psd < (this->ch_PSD->ChartAreas[0]->AxisX->Maximum))
-			&& (energy > (this->ch_PSD->ChartAreas[0]->AxisY->Minimum) && energy < (this->ch_PSD->ChartAreas[0]->AxisY->Maximum)))
+		if ((psd > 0 && psd < 2) && (energy > 0 && energy < 200000))
 			this->ch_PSD->Series["Series1"]->Points->AddXY(fi, psd);
 	
 		//plot code for FOM and Energy Spectrum
-		iESpectrumArrayIndex = static_cast<int>(energy / dSpectrumBinSize);	//check data is within the spectrum bins
-		iFOMArrayIndex = static_cast<int>(psd / dFOMBinSize);
+		iESpectrumArrayIndex = static_cast<int>(energy / 200);	//check data is within the spectrum bins
+		iFOMArrayIndex = static_cast<int>(psd / 0.02);
 		if ((iESpectrumArrayIndex >= 0 && iESpectrumArrayIndex < 1000) && (iFOMArrayIndex >= 0 && iFOMArrayIndex < 99))	//if the point is within the array (on the chart)
 		{
 			if (m_energyLowerCut > 0 || m_energyUpperCut > 0 || m_fomLeftCut > 0 || m_fomRightCut > 0)	//see if the user made cuts
@@ -1506,6 +1527,8 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 				this->ch_FOM->Series["Series1"]->Points->AddXY(dFOMBin, g_iFOMArray[ii]);
 			}
 		}
+		this->tb_updates->Text = "evt proc: " + eventIndex;
+		eventIndex++;
 	}
 
 	
