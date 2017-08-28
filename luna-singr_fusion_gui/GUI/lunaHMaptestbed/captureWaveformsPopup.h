@@ -59,20 +59,20 @@ namespace lunaHMaptestbed {
 	private: System::Windows::Forms::DataVisualization::Charting::Chart^  ch_DisplayWaveforms;
 	private: System::Windows::Forms::Label^  label6;
 	private: System::Windows::Forms::Label^  label5;
-	private: System::Windows::Forms::Label^  label4;
-	private: System::Windows::Forms::Label^  label3;
-	private: System::Windows::Forms::Label^  label2;
-	private: System::Windows::Forms::Label^  label1;
+
+
+
+
 	private: System::Windows::Forms::TextBox^  tb_trigger_threshold;
-	private: System::Windows::Forms::TextBox^  tb_full_int;
-	private: System::Windows::Forms::TextBox^  tb_long_int;
-	private: System::Windows::Forms::TextBox^  tb_short_int;
-	private: System::Windows::Forms::TextBox^  tb_baseline_int;
+
+
+
+
 
 	private: System::Windows::Forms::TextBox^  textBox6;
 	private: System::Windows::Forms::ComboBox^  comboBox1;
 	private: System::Windows::Forms::Button^  bChangeThreshold;
-	private: System::Windows::Forms::Button^  bChangeInts;
+
 	private: System::Windows::Forms::Button^  bCaptureWFs;
 	private: System::IO::Ports::SerialPort^  serialPort1;
 	private: System::ComponentModel::IContainer^  components;
@@ -113,19 +113,10 @@ namespace lunaHMaptestbed {
 			this->ch_DisplayWaveforms = (gcnew System::Windows::Forms::DataVisualization::Charting::Chart());
 			this->label6 = (gcnew System::Windows::Forms::Label());
 			this->label5 = (gcnew System::Windows::Forms::Label());
-			this->label4 = (gcnew System::Windows::Forms::Label());
-			this->label3 = (gcnew System::Windows::Forms::Label());
-			this->label2 = (gcnew System::Windows::Forms::Label());
-			this->label1 = (gcnew System::Windows::Forms::Label());
 			this->tb_trigger_threshold = (gcnew System::Windows::Forms::TextBox());
-			this->tb_full_int = (gcnew System::Windows::Forms::TextBox());
-			this->tb_long_int = (gcnew System::Windows::Forms::TextBox());
-			this->tb_short_int = (gcnew System::Windows::Forms::TextBox());
-			this->tb_baseline_int = (gcnew System::Windows::Forms::TextBox());
 			this->textBox6 = (gcnew System::Windows::Forms::TextBox());
 			this->comboBox1 = (gcnew System::Windows::Forms::ComboBox());
 			this->bChangeThreshold = (gcnew System::Windows::Forms::Button());
-			this->bChangeInts = (gcnew System::Windows::Forms::Button());
 			this->bCaptureWFs = (gcnew System::Windows::Forms::Button());
 			this->serialPort1 = (gcnew System::IO::Ports::SerialPort(this->components));
 			this->b_closeWFwindow = (gcnew System::Windows::Forms::Button());
@@ -190,80 +181,12 @@ namespace lunaHMaptestbed {
 			this->label5->Text = L"Trigger Threshold";
 			this->label5->TextAlign = System::Drawing::ContentAlignment::MiddleLeft;
 			// 
-			// label4
-			// 
-			this->label4->AutoSize = true;
-			this->label4->Location = System::Drawing::Point(736, 173);
-			this->label4->Name = L"label4";
-			this->label4->Size = System::Drawing::Size(61, 13);
-			this->label4->TabIndex = 42;
-			this->label4->Text = L"Full Integral";
-			this->label4->TextAlign = System::Drawing::ContentAlignment::MiddleLeft;
-			// 
-			// label3
-			// 
-			this->label3->AutoSize = true;
-			this->label3->Location = System::Drawing::Point(736, 146);
-			this->label3->Name = L"label3";
-			this->label3->Size = System::Drawing::Size(69, 13);
-			this->label3->TabIndex = 41;
-			this->label3->Text = L"Long Integral";
-			this->label3->TextAlign = System::Drawing::ContentAlignment::MiddleLeft;
-			// 
-			// label2
-			// 
-			this->label2->AutoSize = true;
-			this->label2->Location = System::Drawing::Point(737, 119);
-			this->label2->Name = L"label2";
-			this->label2->Size = System::Drawing::Size(70, 13);
-			this->label2->TabIndex = 40;
-			this->label2->Text = L"Short Integral";
-			this->label2->TextAlign = System::Drawing::ContentAlignment::MiddleLeft;
-			// 
-			// label1
-			// 
-			this->label1->AutoSize = true;
-			this->label1->Location = System::Drawing::Point(737, 92);
-			this->label1->Name = L"label1";
-			this->label1->Size = System::Drawing::Size(85, 13);
-			this->label1->TabIndex = 39;
-			this->label1->Text = L"Baseline Integral";
-			this->label1->TextAlign = System::Drawing::ContentAlignment::MiddleLeft;
-			// 
 			// tb_trigger_threshold
 			// 
 			this->tb_trigger_threshold->Location = System::Drawing::Point(833, 272);
 			this->tb_trigger_threshold->Name = L"tb_trigger_threshold";
 			this->tb_trigger_threshold->Size = System::Drawing::Size(110, 20);
 			this->tb_trigger_threshold->TabIndex = 38;
-			// 
-			// tb_full_int
-			// 
-			this->tb_full_int->Location = System::Drawing::Point(828, 170);
-			this->tb_full_int->Name = L"tb_full_int";
-			this->tb_full_int->Size = System::Drawing::Size(115, 20);
-			this->tb_full_int->TabIndex = 37;
-			// 
-			// tb_long_int
-			// 
-			this->tb_long_int->Location = System::Drawing::Point(828, 143);
-			this->tb_long_int->Name = L"tb_long_int";
-			this->tb_long_int->Size = System::Drawing::Size(115, 20);
-			this->tb_long_int->TabIndex = 36;
-			// 
-			// tb_short_int
-			// 
-			this->tb_short_int->Location = System::Drawing::Point(828, 116);
-			this->tb_short_int->Name = L"tb_short_int";
-			this->tb_short_int->Size = System::Drawing::Size(115, 20);
-			this->tb_short_int->TabIndex = 35;
-			// 
-			// tb_baseline_int
-			// 
-			this->tb_baseline_int->Location = System::Drawing::Point(828, 89);
-			this->tb_baseline_int->Name = L"tb_baseline_int";
-			this->tb_baseline_int->Size = System::Drawing::Size(115, 20);
-			this->tb_baseline_int->TabIndex = 34;
 			// 
 			// textBox6
 			// 
@@ -291,16 +214,6 @@ namespace lunaHMaptestbed {
 			this->bChangeThreshold->Text = L"Change Trigger Threshold";
 			this->bChangeThreshold->UseVisualStyleBackColor = true;
 			this->bChangeThreshold->Click += gcnew System::EventHandler(this, &captureWaveformsPopup::bChangeThreshold_Click);
-			// 
-			// bChangeInts
-			// 
-			this->bChangeInts->Location = System::Drawing::Point(778, 196);
-			this->bChangeInts->Name = L"bChangeInts";
-			this->bChangeInts->Size = System::Drawing::Size(140, 49);
-			this->bChangeInts->TabIndex = 29;
-			this->bChangeInts->Text = L"Change Integrals";
-			this->bChangeInts->UseVisualStyleBackColor = true;
-			this->bChangeInts->Click += gcnew System::EventHandler(this, &captureWaveformsPopup::bChangeInts_Click);
 			// 
 			// bCaptureWFs
 			// 
@@ -436,19 +349,10 @@ namespace lunaHMaptestbed {
 			this->Controls->Add(this->b_closeWFwindow);
 			this->Controls->Add(this->label6);
 			this->Controls->Add(this->label5);
-			this->Controls->Add(this->label4);
-			this->Controls->Add(this->label3);
-			this->Controls->Add(this->label2);
-			this->Controls->Add(this->label1);
 			this->Controls->Add(this->tb_trigger_threshold);
-			this->Controls->Add(this->tb_full_int);
-			this->Controls->Add(this->tb_long_int);
-			this->Controls->Add(this->tb_short_int);
-			this->Controls->Add(this->tb_baseline_int);
 			this->Controls->Add(this->textBox6);
 			this->Controls->Add(this->comboBox1);
 			this->Controls->Add(this->bChangeThreshold);
-			this->Controls->Add(this->bChangeInts);
 			this->Controls->Add(this->bCaptureWFs);
 			this->Controls->Add(this->ch_DisplayWaveforms);
 			this->Controls->Add(this->menuStrip1);
@@ -470,55 +374,6 @@ private: void findPorts(void)
 	array<Object^>^ objectArray = SerialPort::GetPortNames();
 	this->comboBox1->Items->AddRange(objectArray);
 }
-
-private: System::Void bChangeInts_Click(System::Object^  sender, System::EventArgs^  e) {
-	/* This button click will allow the user to change the integral times by sending the proper times over the serial port */
-	/* Variables */
-	int baselineInt = 0;
-	int shortInt = 0;
-	int longInt = 0;
-	int fullInt = 0;
-	String^ retMessage = "";
-	String^ baselineMessage = this->tb_baseline_int->Text;
-	String^ shortMessage = this->tb_short_int->Text;
-	String^ longMessage = this->tb_long_int->Text;
-	String^ fullMessage = this->tb_full_int->Text;
-
-	/* Open the serial port then */
-	if (this->comboBox1->Text == String::Empty) {
-		this->textBox6->Text = "Select a port above.";
-		return;
-	}
-	else
-	{
-		if (!this->serialPort1->IsOpen) {
-			this->serialPort1->PortName = this->comboBox1->Text;
-			this->serialPort1->Open();
-			this->bChangeInts->Enabled = false;
-		}
-		else {
-			this->textBox6->Text = (this->comboBox1->Text) + " is already open.";
-			this->bChangeInts->Enabled = false;
-			Application::DoEvents();
-		}
-	}
-
-	this->serialPort1->WriteLine("12");	//change integrals at the main menu
-	Sleep(500);
-	this->serialPort1->WriteLine(baselineMessage);
-	Sleep(500);
-	this->serialPort1->WriteLine(shortMessage);
-	Sleep(500);
-	this->serialPort1->WriteLine(longMessage);
-	Sleep(500);
-	this->serialPort1->WriteLine(fullMessage);
-	Sleep(500);
-
-	this->serialPort1->DiscardInBuffer();
-
-	this->textBox6->Text = "Integral times have been set.";
-	this->bChangeInts->Enabled = true;
-}//eochangeInts
 
 private: System::Void bChangeThreshold_Click(System::Object^  sender, System::EventArgs^  e) {
 	/* This button click will allow the user to change the trigger threshold of the system over the serial port */
@@ -545,8 +400,8 @@ private: System::Void bChangeThreshold_Click(System::Object^  sender, System::Ev
 	}
 
 	/* Send commands to the uZ over the serial connection */
-	this->serialPort1->WriteLine("11");				//choose change threshold from main menu
-	retMessage = this->serialPort1->ReadLine();		//read the line that ask for the new threshold
+	this->serialPort1->WriteLine("3");				//choose change threshold from main menu
+	Sleep(500);		//read the line that ask for the new threshold
 	this->serialPort1->WriteLine(thresholdMessage);	//write the threshold specified by the user
 	Sleep(1200);
 

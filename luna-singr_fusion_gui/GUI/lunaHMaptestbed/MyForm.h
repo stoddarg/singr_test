@@ -4,6 +4,10 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <cctype>
+#include <algorithm>
+#include <cstdlib>
 #include <iomanip>
 #include <stdlib.h>					//for marshalling
 #include <msclr/marshal_cppstd.h>	//for marshalling
@@ -14,18 +18,29 @@
 #define BINARY_DATABUFFER_SIZE	49152
 #define DATABUFFER_SIZE			12288
 
-struct EventData
+value struct EventData
 {
-	double s_time;
-	long long s_totalEvents;
-	int s_eventCount;
-	double s_baseline;
-	double s_shortInt;
-	double s_longInt;
-	double s_fullInt;
-	double s_baselineAvg;
-	double s_PSDvalue;
-	double s_energy;
+	int aaTotalEvents;	// AA stands for adjacent average
+	int aaEventNumber;	// should be matched across all integrators
+	double aaBaselineInt;
+	double aaShortInt;
+	double aaLongInt;
+	double aaFullInt;
+	int aaEight;		// placeholder
+	int lpfEventNumber;	// LPF stands for Low Pass Filter
+	int lpfTTLSignal;	// PNG signal in
+	double lpfBaselineInt;
+	double lpfShortInt;
+	double lpfFullInt;
+	int lpfSeven;		// placeholder
+	int lpfEight;		// placeholder
+	double dffTimeSmall;	// DFF stands for Differential filter	//timesmall+timebig = time in seconds
+	double dffTimeBig;		//small * 128e-9 + big * 549.7558139 = time (s)
+	int dffEventNumber;
+	double dffBaselineInt;
+	double dffShortInt;
+	int dffSeven;		// placeholder
+	int dffEight;		// placeholder
 };
 
 namespace lunaHMaptestbed {
@@ -100,12 +115,17 @@ namespace lunaHMaptestbed {
 
 
 	private: bool psdCap_run;
-	private: array<int>^ g_dataBuffer;
+	private: array<unsigned int>^ g_dataBuffer;
 	private: array<unsigned char>^ g_binaryDataBuffer;
 	private: ref struct dataForBkgdWorker {
 		String^ mstrFileName;
 		String^ portName;
 	};
+	private: double dSpectrumBinSize;
+	private: double dFOMBinSize;
+	private: int iNumberSpectrumBins;
+	private: int iFOMBins;
+
 	private: System::Windows::Forms::MenuStrip^  menuStrip1;
 	private: System::Windows::Forms::ToolStripMenuItem^  fileToolStripMenuItem;
 	private: System::Windows::Forms::ToolStripMenuItem^  restartToolStripMenuItem;
@@ -865,7 +885,6 @@ private: System::Void b_SetIntegrationTimes_Click(System::Object^  sender, Syste
 
 private: System::Void b_SetThreshold_Click(System::Object^  sender, System::EventArgs^  e) {
 	/* This button click will allow the user to change the trigger threshold of the system over the serial port */
-	String^ retMessage = "";	//allows for testing
 	String^ thresholdMessage = this->tb_trigger->Text;
 
 	/* Open the serial port */
@@ -891,8 +910,6 @@ private: System::Void b_SetThreshold_Click(System::Object^  sender, System::Even
 	this->serialPort1->WriteLine("3");				//choose change threshold from main menu
 	Sleep(500);
 	this->serialPort1->WriteLine(thresholdMessage);	//write the threshold specified by the user
-	//retMessage = this->serialPort1->ReadLine();		//read the line that ask for the new threshold	//removed all feedback from devkit
-	Application::DoEvents();
 	Sleep(1200);
 
 	this->serialPort1->DiscardInBuffer();
@@ -900,21 +917,6 @@ private: System::Void b_SetThreshold_Click(System::Object^  sender, System::Even
 	///* Clean up */
 	this->tb_updates->Text = "Trigger threshold has been set.";
 	this->b_SetThreshold->Enabled = true;
-
-	//this->serialPort1->WriteLine("a\r");
-	//retMessage = this->serialPort1->ReadLine();
-	//this->tb_updates->Text = retMessage;
-	//Application::DoEvents();
-	//this->b_SetThreshold->Enabled = true;
-
-	//unsigned char one = 1;
-	//unsigned char two = 2;
-	//unsigned char three = 4;
-	//unsigned char four = 8;
-
-	//int myint{ 0 };
-	//myint = (one << (8 * 3)) | (two << (8 * 2)) | (three << (8 * 1)) | four;
-	//this->tb_updates->Text = myint + " ";
 
 }//eoSetThreshold
 
@@ -933,7 +935,7 @@ private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventA
 		backgroundWorker1->CancelAsync();
 		return;	//returns out of this function call to the still running call of this function
 	}
-	String^ s_fileName;
+	//String^ s_fileName;
 	dataForBkgdWorker^ s_variables = gcnew dataForBkgdWorker;	//lets you name the fileName and portName
 
 	if (this->comboBox1->Text == String::Empty) {
@@ -957,28 +959,27 @@ private: System::Void b_capturePSD_Click(System::Object^  sender, System::EventA
 		s_variables->mstrFileName = this->saveFileDialog1->FileName;
 	}
 
-	//set up the charts here
-	/* Determine domain and range for the FOM, Energy Spectrum charts here */ //just declaring the variable here doesn't work for other functions
-																			  /* Determine the domain and set axes for the spectrum graph */
+	/* Determine domain and range for the FOM, Energy Spectrum charts here */
 	double dPSDXmin = 0.0;
 	double dPSDXmax = 0.0;
 	double dSpectrumDomain = 0.0;
 	double dPSDYmin = 0.0;
 	double dPSDYmax = 0.0;
 	double dFOMRange = 0.0;
-	int iNumberSpectrumBins = 1000.0;
-	int iFOMBins = 100.0;
-	double dSpectrumBinSize = 0.0;
-	double dFOMBinSize = 0.0;
+	iNumberSpectrumBins = 1000;	//these variables are globals
+	iFOMBins = 100;				//
+	dSpectrumBinSize = 0.0;		//
+	dFOMBinSize = 0.0;			//
 
+	/* Determine the domain and set axes for the spectrum graph */
 	dPSDXmin = this->ch_PSD->ChartAreas[0]->AxisX->Minimum;			//get the min and max of the PSD chart
 	dPSDXmax = this->ch_PSD->ChartAreas[0]->AxisX->Maximum;
 	this->ch_Spectrum->ChartAreas[0]->AxisX->Minimum = dPSDXmin;	//set the min and max of the spectrum chart to match
 	this->ch_Spectrum->ChartAreas[0]->AxisX->Maximum = dPSDXmax;
 	dSpectrumDomain = dPSDXmax - dPSDXmin;							//determine that domain of values
-	dSpectrumBinSize = dSpectrumDomain / iNumberSpectrumBins;					//set the bin size accordingly //currently 1000 bins
+	dSpectrumBinSize = dSpectrumDomain / iNumberSpectrumBins;		//set the bin size accordingly //currently 1000 bins
 
-																				/* Determine the range, set axes, and calculate the bin size for the FOM graph */
+	/* Determine the range, set axes, and calculate the bin size for the FOM graph */
 	dPSDYmin = this->ch_PSD->ChartAreas[0]->AxisY->Minimum;
 	dPSDYmax = this->ch_PSD->ChartAreas[0]->AxisY->Maximum;
 	this->ch_FOM->ChartAreas[0]->AxisX->Minimum = dPSDYmin;
@@ -1288,7 +1289,7 @@ private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::
 	int offset{ 0 };
 	int dataBuffer[100]{};
 	String^ amessage = "";
-	g_dataBuffer = gcnew array<int>(DATABUFFER_SIZE) {};
+	g_dataBuffer = gcnew array<unsigned int>(DATABUFFER_SIZE) {};
 
 	while (worker->CancellationPending == false)
 	{
@@ -1298,7 +1299,7 @@ private: System::Void backgroundWorker1_DoWork(System::Object^  sender, System::
 
 		while (index < DATABUFFER_SIZE)	//read the entire thing into our u8 buffer so we may sort it back into integers and save it
 		{
-			Int32::TryParse(this->serialPort1->ReadLine(), g_dataBuffer[index]);	//parse in the line that we are reading 
+			UInt32::TryParse(this->serialPort1->ReadLine(), g_dataBuffer[index]);	//parse in the line that we are reading 
 			outputFile << g_dataBuffer[index] << std::endl;		//save it to a file in a column
 			index++;
 		}
@@ -1342,29 +1343,196 @@ private: System::Void backgroundWorker1_ProgressChanged(System::Object^  sender,
 
 	//Variables for processing
 	int index(0);
-	double bl1(0);	double bl2(0); double bl3(0); double bl4(0); double bl_avg(0);
-	double si(0); double li(0); double fi(0);
-	double psd(0);
-	double energy(0);
+	int eventIndex(0);
 
-	array<int>^ dataBufferPassed = safe_cast<array<int>^>(e->UserState);	//this will be an array[12288]
+	array<unsigned int>^ dataBufferPassed = safe_cast<array<unsigned int>^>(e->UserState);	//this will be an array[12288]
+	array<EventData>^ eventsSorted = gcnew array<EventData>(512);
 
-	while (index < DATABUFFER_SIZE)
+	//consume the first 111111 from databufferpassed
+	while (1)
+	{
+		if (dataBufferPassed[index] == 111111)	//is the value in the array = 111111?
+		{
+			index++;							//if yes, increment by 1 (the next value is the real ID) and break; 
+			break;								
+		}
+		index++;								//if no, keep searching
+	}
+
+	while (index < DATABUFFER_SIZE)	//for sorting data //comment while verifying that we get data
 	{
 		switch (dataBufferPassed[index])
 		{
 		case 111111:
 			//process the AA integrator data
-			if ((psd > (this->ch_PSD->ChartAreas[0]->AxisX->Minimum) && psd < (this->ch_PSD->ChartAreas[0]->AxisX->Maximum)) 
-				&& (energy > (this->ch_PSD->ChartAreas[0]->AxisY->Minimum) && energy < (this->ch_PSD->ChartAreas[0]->AxisY->Maximum)))
-				this->ch_PSD->Series["Series1"]->Points->AddXY(fi, psd);
+			eventsSorted[eventIndex].aaTotalEvents = dataBufferPassed[index + 1];
+			eventsSorted[eventIndex].aaEventNumber = dataBufferPassed[index + 2];
+			eventsSorted[eventIndex].aaBaselineInt = dataBufferPassed[index + 3];
+			eventsSorted[eventIndex].aaShortInt = dataBufferPassed[index + 4];
+			eventsSorted[eventIndex].aaLongInt = dataBufferPassed[index + 5];
+			eventsSorted[eventIndex].aaFullInt = dataBufferPassed[index + 6];
+			eventsSorted[eventIndex].aaEight = dataBufferPassed[index + 7];
 			index += 8;
 			break;
 		case 121212:
-
+			//process the LPF data
+			eventsSorted[eventIndex].lpfEventNumber = dataBufferPassed[index + 1];
+			eventsSorted[eventIndex].lpfTTLSignal = dataBufferPassed[index + 2];
+			eventsSorted[eventIndex].lpfBaselineInt = dataBufferPassed[index + 3];
+			eventsSorted[eventIndex].lpfShortInt = dataBufferPassed[index + 4];
+			eventsSorted[eventIndex].lpfFullInt = dataBufferPassed[index + 5];
+			eventsSorted[eventIndex].lpfSeven = dataBufferPassed[index + 6];
+			eventsSorted[eventIndex].lpfEight = dataBufferPassed[index + 7];
+			index += 8;
+			break;
+		case 131313:
+			//process the LPF data
+			eventsSorted[eventIndex].dffTimeSmall = dataBufferPassed[index + 1];
+			eventsSorted[eventIndex].dffTimeBig = dataBufferPassed[index + 2];
+			eventsSorted[eventIndex].dffEventNumber = dataBufferPassed[index + 3];
+			eventsSorted[eventIndex].dffBaselineInt = dataBufferPassed[index + 4];
+			eventsSorted[eventIndex].dffShortInt = dataBufferPassed[index + 5];
+			eventsSorted[eventIndex].dffSeven = dataBufferPassed[index + 6];
+			eventsSorted[eventIndex].dffEight = dataBufferPassed[index + 7];
+			break;
+		default:
+			//if we hit this, we didn't find an identifier or the array is finished
+			index++;	//check the next entry
+			break;
+		}
+		eventIndex++;			//move to the next event in the struct
+		if (eventIndex > 511)	//if we are at the bottom, reset for the next parts of the struct
+		{
+			index++;
+			eventIndex = 0;
 		}
 	}
 
+	//Now that data is sorted, sift through and plot it
+	array<double>^ aablavgArray = gcnew array<double>(512);
+	double bl1(0);	double bl2(0); double bl3(0); double bl4(0); double bl_avg(0);
+	double si(0); double li(0); double fi(0);
+	double psd(0);
+	double energy(0);
+
+	array<int>^ g_iESpectrumArray = gcnew array<int>(1000) {};	//variables for Energy Spectrum and FOM charts
+	array<int>^ g_iFOMArray = gcnew array<int>(1000) {};
+	double dESpectrumBin(0.0);	
+	double dFOMBin(0.0);
+	double dFOMBinSize = (0.0);
+	int iESpectrumArrayIndex(0);
+	int iFOMArrayIndex(0);
+
+	eventIndex = 0;	//reset this value
+	while (eventIndex < 512)	//plots the charts for each event
+	{
+		bl4 = bl3; bl3 = bl2; bl2 = bl1;
+		bl1 = eventsSorted[eventIndex].aaBaselineInt / (16.0 * 38.0);
+		if (bl4 == 0.0)
+			bl_avg = bl1;
+		else
+			bl_avg = (bl4 + bl3 + bl2 + bl1) / 4.0;
+		aablavgArray[eventIndex] = bl_avg;
+		si = eventsSorted[eventIndex].aaShortInt / 16.0 - (bl_avg * 73.0);
+		si = eventsSorted[eventIndex].aaLongInt / 16.0 - (bl_avg * 169.0);
+		si = eventsSorted[eventIndex].aaFullInt / 16.0 - (bl_avg * 1551.0);
+		psd = si / (li - si);
+		energy = 1.0 * fi + 0.0;
+
+		//plot code for PSD
+		if ((psd > (this->ch_PSD->ChartAreas[0]->AxisX->Minimum) && psd < (this->ch_PSD->ChartAreas[0]->AxisX->Maximum))
+			&& (energy > (this->ch_PSD->ChartAreas[0]->AxisY->Minimum) && energy < (this->ch_PSD->ChartAreas[0]->AxisY->Maximum)))
+			this->ch_PSD->Series["Series1"]->Points->AddXY(fi, psd);
+	
+		//plot code for FOM and Energy Spectrum
+		iESpectrumArrayIndex = static_cast<int>(energy / dSpectrumBinSize);	//check data is within the spectrum bins
+		iFOMArrayIndex = static_cast<int>(psd / dFOMBinSize);
+		if ((iESpectrumArrayIndex >= 0 && iESpectrumArrayIndex < 1000) && (iFOMArrayIndex >= 0 && iFOMArrayIndex < 99))	//if the point is within the array (on the chart)
+		{
+			if (m_energyLowerCut > 0 || m_energyUpperCut > 0 || m_fomLeftCut > 0 || m_fomRightCut > 0)	//see if the user made cuts
+			{
+				//the user has made cuts
+				//now we require the point (energy, psd) to be inside those cuts
+				if ((m_fomLeftCut > 0) && (m_fomRightCut > 0))		//we have an upper and right cut
+				{
+					if ((energy >= m_fomLeftCut && energy <= m_fomRightCut) && (psd >= m_energyLowerCut && psd <= m_energyUpperCut))
+					{
+						++g_iESpectrumArray[iESpectrumArrayIndex];
+						++g_iFOMArray[iFOMArrayIndex];
+					}
+				}
+				else if ((m_energyUpperCut > 0) && (m_fomRightCut == 0))	//we have an upper and no right cut
+				{
+					if ((energy >= m_fomLeftCut) && (psd >= m_energyLowerCut && psd <= m_energyUpperCut))		//any energy above cut left will do, psd below/within cuts
+					{
+						++g_iESpectrumArray[iESpectrumArrayIndex];
+						++g_iFOMArray[iFOMArrayIndex];
+					}
+				}
+				else if ((m_energyUpperCut == 0) && (m_fomRightCut > 0))	//we have a right cut and no upper cut
+				{
+					if ((energy >= m_fomLeftCut && energy <= m_fomRightCut) && (psd >= m_energyLowerCut))	//any psd above lower cut will do, energy below/within cuts
+					{
+						++g_iESpectrumArray[iESpectrumArrayIndex];
+						++g_iFOMArray[iFOMArrayIndex];
+					}
+				}
+				else										//only lower/left cuts
+				{
+					if ((energy >= m_fomLeftCut) && (psd >= m_energyLowerCut))		//any psd and energy above minimums
+					{
+						++g_iESpectrumArray[iESpectrumArrayIndex];
+						++g_iFOMArray[iFOMArrayIndex];
+					}
+				}
+			}
+			else	//if the user did not make cuts, but the point is within the bins
+			{
+				++g_iESpectrumArray[iESpectrumArrayIndex];
+				++g_iFOMArray[iFOMArrayIndex];
+			}
+			/* clear charts and plot the arrays */
+			this->ch_Spectrum->Series["Series1"]->Points->Clear();
+			this->ch_FOM->Series["Series1"]->Points->Clear();
+
+			for (int jj = 0; jj < (iNumberSpectrumBins - 1); jj++)
+			{
+				dESpectrumBin = dSpectrumBinSize * (jj + 0.5);
+				this->ch_Spectrum->Series["Series1"]->Points->AddXY(dESpectrumBin, g_iESpectrumArray[jj]);
+			}
+			for (int ii = 0; ii < (iFOMBins - 1); ii++)
+			{
+				dFOMBin = dFOMBinSize * (ii + 0.5);
+				this->ch_FOM->Series["Series1"]->Points->AddXY(dFOMBin, g_iFOMArray[ii]);
+			}
+		}
+	}
+
+	
+
+	
+
+	//save Erik's file here
+	std::ofstream outputFile_Erik;
+	outputFile_Erik.open("ndieaway.txt", std::ios::app);
+	for (index = 0; index < 511; index++)
+	{
+		outputFile_Erik << std::setw(11) << eventsSorted[index].aaEventNumber
+			<< std::setw(11) << eventsSorted[index].aaTotalEvents
+			<< std::setw(11) << eventsSorted[index].lpfTTLSignal
+			<< std::setw(11) << ((eventsSorted[index].dffTimeSmall * 128.0e-9) + (eventsSorted[index].dffTimeBig * 549.7558139))
+			<< std::setw(11) << (eventsSorted[index].aaBaselineInt)
+			<< std::setw(11) << (eventsSorted[index].aaShortInt / 16.0 - aablavgArray[index] * 73.0)
+			<< std::setw(11) << (eventsSorted[index].aaLongInt / 16.0 - aablavgArray[index] * 169.0)
+			<< std::setw(11) << (eventsSorted[index].aaFullInt / 16.0 - aablavgArray[index] * 1551.0)
+			<< std::setw(11) << (eventsSorted[index].lpfBaselineInt / 16.0)
+			<< std::setw(11) << (eventsSorted[index].lpfShortInt / 16.0)
+			<< std::setw(11) << (eventsSorted[index].lpfFullInt / 16.0)
+			<< std::setw(11) << (eventsSorted[index].dffBaselineInt / 16.0)
+			<< std::setw(11) << (eventsSorted[index].dffShortInt / 16.0)
+			<< std::endl;
+	}
+	outputFile_Erik.close();
 }
 private: System::Void backgroundWorker1_RunWorkerCompleted(System::Object^  sender, System::ComponentModel::RunWorkerCompletedEventArgs^  e) 
 {
