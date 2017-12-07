@@ -69,16 +69,15 @@ int main()
 	FATFS fatfs;
 
 	//test variables
-	u8 * pc_ReportBuff2;
-	pc_ReportBuff2 = (u8 *)calloc(101, sizeof(u8));
-	u8 * pu_testdatapieces;
-	pu_testdatapieces = (u8 *)calloc(49152, sizeof(u8));
+//	u8 * pc_ReportBuff2;
+//	pc_ReportBuff2 = (u8 *)calloc(101, sizeof(u8));
+//	u8 * pu_testdatapieces;
+//	pu_testdatapieces = (u8 *)calloc(49152, sizeof(u8));
 	int iSprintfReturn = 0;
 	int bytesSent = 0;
 	int testxilin = 0;
+	int myreturn = 0;
 
-//	for (i=0; i<32; i++ ) { RecvBuffer[i] = '_'; }		// Clear RecvBuffer Variable
-//	for (i=0; i<32; i++ ) { SendBuffer[i] = '_'; }		// Clear SendBuffer Variable
 	memset(RecvBuffer, '\0',32);
 	memset(SendBuffer, '\0',32);
 
@@ -154,7 +153,7 @@ int main()
 //		xil_printf(" 4) Set Integration Times (number of clock cycles * 4ns) \n\r");
 //		xil_printf("\n\r ** Additional Commands ** \n\r");
 //		xil_printf(" 5) Perform a DMA transfer of Waveform Data\n\r");
-//		xil_printf(" 6) Perform a DMA transfer of Processed Data\n\r");
+//		xil_printf(" 6) Send WFs to the GUI
 //		xil_printf(" 7) Check the Size of the Data Buffered (Max = 4095) \n\r");
 //		xil_printf(" 8) Clear the Processed Data Buffers\n\r");
 //		xil_printf(" 9) Execute Print of Data on DRAM \n\r");
@@ -246,6 +245,28 @@ int main()
 			break;
 
 		case 6:
+			//print waveforms to the GUI
+			//set the mode with case 0:
+			//make this just like case 2, except we have a different mode
+
+//			mode = 0;
+//			Xil_Out32 (XPAR_AXI_GPIO_14_BASEADDR, ((u32)mode));	//set mode to processed data
+			enable_state = 1;
+			Xil_Out32 (XPAR_AXI_GPIO_18_BASEADDR, ((u32)enable_state));	//set enable device
+
+			ipollReturn = 0;
+			bytesSent = 0;
+			index = 0;
+
+			while(ipollReturn != 113)	//loop until gettting a 'q' in the RecvBuffer
+			{
+//				if(Xil_In32(XPAR_AXI_GPIO_11_BASEADDR) > 0)	//if the buffer is full, read it to SD
+					WFDAQ();	//eventually, need to put the buffer check back in (above) so that this doesn't just read garbage continuously
+
+				ipollReturn = PollUart(RecvBuffer, &Uart_PS);	//return value of 97(a), 113(q), or 0(else)
+
+				memset(testdata, '\0', 12288);
+			}
 			break;
 
 		case 7:
@@ -548,3 +569,42 @@ int DAQ(){
 	return sw;
 }
 //////////////////////////// DAQ ////////////////////////////////
+
+//////////////////////////// WF DAQ ////////////////////////////////
+int WFDAQ(){
+	Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 1);				//enable read out
+	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x48, 0xa000000);	//tell the fpga what address to start at
+	Xil_Out32 (XPAR_AXI_DMA_0_BASEADDR + 0x58 , 65536);		//and how much to transfer
+	usleep(54); 			// Built in Latency - 54 us
+	Xil_Out32 (XPAR_AXI_GPIO_15_BASEADDR, 0);				//disable read out
+
+	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,1);	//Clear the buffers //Reset the read address
+	usleep(1);								// Built in Latency - 1 us // 1 clock cycle-ish
+	Xil_Out32(XPAR_AXI_GPIO_9_BASEADDR,0);
+
+	PrintWFData();
+
+	return sw;
+}
+//////////////////////////// WF DAQ ////////////////////////////////
+
+//////////////////////////// PrintWFData ////////////////////////////////
+int PrintWFData( ){
+	int data = 0;
+	int dram_addr = 0;
+	int dram_base = 0xa000000;		// 167772160 + 4096 = 167776256
+	int dram_ceiling = 0xa001000;	// this reads out 4096/4 ints from the buffer
+
+	Xil_DCacheInvalidateRange(0x00000000, 65536);	//make sure the PS doesn't corrupt the memory by accessing while doing DMA transfer
+
+	dram_addr = dram_base;
+	while(dram_addr <= dram_ceiling)	//will loop over 49152/4 addresses = 12288
+	{
+		data = Xil_In32(dram_addr);	//grab the int from DRAM
+		dram_addr += 4;
+		xil_printf("%d\r\n", data);
+	}
+
+	return sw;
+}
+//////////////////////////// PrintWFData ////////////////////////////////

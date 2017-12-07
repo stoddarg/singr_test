@@ -70,5 +70,7 @@ void SetIntegrationTimes(u8 wfid);	// Set the Registers forIntegral Times
 int PrintData();					// Print Data to the Terminal Window
 void ClearBuffers();				// Clear Processeed Data Buffers
 int DAQ();				// Clear Processeed Data Buffers
+int WFDAQ();
+int PrintWFData();
 
 #endif /* LAPP_H_ */
